@@ -1,5 +1,5 @@
 # Atomic-Force-Microscopy
-Programmatic AFM system control. The majority of the code controls LIAs; some controls the current in the superconducting coils.
+Programmatic AFM system control. The code controls LIAs and the superconducting magnetic coils.
 
 This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group at the University of Warwick.
 
