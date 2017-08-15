@@ -3,9 +3,13 @@ Programs controlling aspects of an AFM system. The majority of the code controls
 This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group.
 
 ## Hysteresis Measurement:
-Intrument: Zurich Instruments HF2LI LIA. 
+### Intrument:
 
-Description: A GUI for hysteresis measurement via PFM. It allows the user to setup stepwise voltage increases and loop them as desired. Additional functionality, such as DFRT, can be implimented via ziControl.
+Zurich Instruments HF2LI LIA. 
+
+### Description:
+
+A GUI for hysteresis measurement via PFM. It allows the user to setup stepwise voltage increases and loop them as desired. Additional functionality, such as DFRT, can be implimented via ziControl.
 
 
 ### Features:
