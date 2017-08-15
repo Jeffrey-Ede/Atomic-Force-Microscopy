@@ -1,7 +1,14 @@
 # Atomic-Force-Microscopy
-Programmic AFM system control. The majority of the code controls LIAs; some controls the current in the superconducting coils.
+Programmatic AFM system control. The majority of the code controls LIAs; some controls the current in the superconducting coils.
 
-This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group.
+This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group at the University of Warwick.
+
+## Note:
+
+This LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances. At the time of writing, 17:47 15/08/2017, the SR865A is sitting on my desk unused.
+
+The code relies on relevant instrument drivers being installed. Figuring out how to or which drivers to install via manufacturers websites can be lengthly, so it's probably best to ask me.
+
 
 ## Hysteresis Measurement
 
@@ -27,9 +34,9 @@ The GUI has graphing capabilities. Graphs can be zoomed into and saved as images
 
 Sampled data can be outputted to a file via a save as dialogue.
 
-## LIA-SR865A
+## LIA-SR865A.vi
 
-Contents: Labview virtual instrument
+Labview virtual instrument
 
 ### Instrument: 
 
@@ -43,7 +50,34 @@ A GUI that allows the user to remotely control the LIA.
 
 Virtual control panel offering easier configuration control, in some cases, than the physical control panel. Input and output clusters have been wired in anticipation of contacting other programs as part of a larger GUI.
 
-### Note:
+## Resonance.vi
 
-This LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
+Labview virtual instrument.
 
+### Instrument:
+
+Stanford Research SR865A LIA
+
+### Description:
+
+Boxcar averages sweep data and outputs the maximum. It outputs the highest resonance if there are multiple. 
+
+### Features
+
+Graphs sweep, allowing visual interpretation of the resonance value. It performs an R-Freq scan; however, this can be programmatically adjusted to other types of scan.
+
+### SweepOver.vi
+
+Labview virtual instrument
+
+### Instrument:
+
+Stanford Research SR865A LIA
+
+### Description
+
+Highly customisable sweeper. It can sweep over 5 paramters and lock into 17. Can perform single, up-down or continuous sweeps.
+
+### Features
+
+Designed to be easily wired to the Resonance VI.
