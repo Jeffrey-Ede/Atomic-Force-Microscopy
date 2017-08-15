@@ -5,12 +5,12 @@ This work was carried out under the supervision of Dr Dong Jik Kim in professor 
 
 ## Note:
 
-This LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances. At the time of writing, 17:47 15/08/2017, the SR865A is sitting on my desk unused.
+The SR865A LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
 
 The code relies on relevant instrument drivers being installed. Figuring out how to or which drivers to install via manufacturers websites can be lengthly, so it's probably best to ask me.
 
 
-## Hysteresis Measurement
+## Hysteresis_Measurement
 
 Contents: Python source code, batch file to start GUI, icon for batch shortcut and a text file containing default values.
 
@@ -33,6 +33,24 @@ The GUI field parameters can be saved to a text file as defaults for future use.
 The GUI has graphing capabilities. Graphs can be zoomed into and saved as images. Multiple successive measurements can be plotted on the same graph.
 
 Sampled data can be outputted to a file via a save as dialogue.
+
+## Superconductor_Fields
+
+Contents: Labview virtual instruments
+
+### Instrument:
+
+### Description:
+
+MagPowSup.vi allows the user to enter algebraic coeffients describing to describe the 3D evolution of a magnetic field vector. The other instruments are subVIs. The code has not been tested yet due to technical difficulties with the AFM.
+
+### Features:
+
+Allows algebraic description of magnetic field evolution. Multiple algebraic expressions can be queued for different times and looped.
+
+Checks that the rate of change in field doesn't exceed the maximum at any point in the expressions by simulating the vector sweep beforehand. If it does, a warning is given and the program refuses to execute.
+
+3D comet plot of magnet field evolution.
 
 ## Hysteresis.vi
 
