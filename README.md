@@ -46,7 +46,7 @@ APS100 Magnetic Power Supply
 
 ### Description:
 
-MagPowSup.vi allows the user to enter algebraic coeffients describing to describe the 3D evolution of a magnetic field vector. The other instruments are subVIs. The code has not been tested yet due to technical difficulties with the AFM.
+MagPowSup.vi allows the user to enter algebraic coeffients describing the 3D evolution of a magnetic field vector. The other instruments are subVIs. The code has not been tested yet due to technical difficulties with the AFM.
 
 ### Features:
 
@@ -54,7 +54,7 @@ Allows algebraic description of magnetic field evolution. Multiple algebraic exp
 
 Checks that the rate of change in field doesn't exceed the maximum at any point in the expressions by simulating the vector sweep beforehand. If it does, a warning is given and the program refuses to execute.
 
-3D comet plot of magnet field evolution.
+3D comet plot of magnet field evolution. 2D x-y, x-z or y-z views are optional.
 
 ## Hysteresis.vi
 
