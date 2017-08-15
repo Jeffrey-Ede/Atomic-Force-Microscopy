@@ -44,5 +44,5 @@ Virtual control panel offering easier configuration control, in some cases, than
 
 ### Note:
 
-This LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages needed for PFM, adding additional complications. The HF2LI can operate over larger parameter ranges in almost all instances.
+This LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
 
