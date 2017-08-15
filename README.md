@@ -34,6 +34,28 @@ The GUI has graphing capabilities. Graphs can be zoomed into and saved as images
 
 Sampled data can be outputted to a file via a save as dialogue.
 
+## Hysteresis.vi
+
+Labview virtual instrument
+
+### Instrument:
+
+Stanford Research SR865A LIA
+
+### Description:
+
+Allows hysteresis measurement via PFM. It allows the user to setup stepwise voltage increases and loop them as desired. DFRT could be incorporated by using a second LIA.
+
+### Features
+
+The user can specify 0V periods between voltage steps. Additionally, intermission times can be specified separately for non-0V and 0V to allow the system to settle before data is recorded.
+
+Various configuration setting of the LIA, including signal outputs and input terminals, can be changed.
+
+There are 10 graphing panes so that all the outputs, which are dynamically updated, are always immediately available rather than the user having to switch what a single graph displays. 
+
+Outputs can be outputted to files via save as dialogues.
+
 ## LIA-SR865A.vi
 
 Labview virtual instrument
