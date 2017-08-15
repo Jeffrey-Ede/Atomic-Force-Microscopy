@@ -34,11 +34,15 @@ The GUI has graphing capabilities. Graphs can be zoomed into and saved as images
 
 Sampled data can be outputted to a file via a save as dialogue.
 
+Tooltips give helpful hints about how to use the entry fields.
+
 ## Superconductor_Fields
 
 Contents: Labview virtual instruments
 
 ### Instrument:
+
+APS100 Magnetic Power Supply
 
 ### Description:
 
