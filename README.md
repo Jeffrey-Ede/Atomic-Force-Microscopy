@@ -1,5 +1,6 @@
 # Atomic-Force-Microscopy
-Programs controlling aspects of an AFM system. The majority of the code controls LIAs, some controls the current in the superconducting coils.
+Programmic AFM system control. The majority of the code controls LIAs; some controls the current in the superconducting coils.
+
 This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group.
 
 ## Hysteresis Measurement
