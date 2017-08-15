@@ -7,7 +7,7 @@ This work was carried out under the supervision of Dr Dong Jik Kim in professor 
 
 The SR865A LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
 
-The code relies on relevant instrument drivers being installed. Figuring out how to or which drivers to install via manufacturers websites can be lengthly, so it's probably best to ask me.
+The code relies on relevant instrument drivers being installed. Figuring out how to or which drivers to install via manufacturers' websites can be lengthly, so it's probably best to just ask me.
 
 
 ## Hysteresis_Measurement
