@@ -223,12 +223,12 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.makeDefaultButton, "Make current entry field values default.")
         tooltip.createToolTip(self.plotxEntry, "Plot on horizontal axis of graph.")
         tooltip.createToolTip(self.plotyEntry, "Plot on vertical axis of graph.")
-        tooltip.createToolTip(self.plotButton, "plot graph.")
+        tooltip.createToolTip(self.plotButton, "Plot graph.")
         tooltip.createToolTip(self.clearPlotButton, "Clear data.")
         tooltip.createToolTip(self.saveButton, "Opens save as dialogue.\nDefault: .txt")
         tooltip.createToolTip(self.probeOutEntry, "Probe signal output.")
         tooltip.createToolTip(self.avgRepeatedxEntry, "Average repeated horizontal values in plot.")
-        tooltip.createToolTip(self.avgRepeatedyEntry, "Average repeated horizontal values in plot.")
+        tooltip.createToolTip(self.avgRepeatedyEntry, "Average repeated vertical values in plot.")
         
 
         ###################################################
