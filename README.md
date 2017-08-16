@@ -1,22 +1,22 @@
 # Atomic-Force-Microscopy
-Programmatic AFM system control. The code controls LIAs and the superconducting magnetic coils.
+Programmatic atomic force microscrope system control. The code controls lock-in amplifiers (LIAs) and the superconducting magnetic coils.
 
 This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group at the University of Warwick.
 
 ## Note:
 
-The SR865A LIA was abandoned in favor of the ZI HF2LI LIA as 2 SR865As would be needed to support DFRT and we don't have a second one lying around. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for PFM, adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
+The SR865A LIA was abandoned in favor of the Zurich Instruments (ZI) HF2LI LIA as two SR865As would be needed to support dual frequency resonance tracking (DFRT) and we don't have a second. Only one HF2LI is needed to support DFRT. Additionally, the SR865A outputs are more dependent on preamplification or T junctions to get the higher voltages desired for piezoelectric force microscopy (PFM), adding complications. The HF2LI can operate over larger parameter ranges in almost all instances.
 
 The code relies on relevant instrument drivers being installed. Figuring out how to or which drivers to install via manufacturers' websites can be lengthly, so it's probably best to just ask me.
 
 
 ## Hysteresis_Measurement
 
-Contents: Python source code, batch file to start GUI, icon for batch shortcut, text file containing default values and tooltips module.
+Contents: Python source code, batch file to start graphical user interface, icon for batch shortcut, text file containing default values and tooltips module.
 
 ### Intrument:
 
-Zurich Instruments HF2LI LIA. 
+ZI HF2LI LIA. 
 
 ### Description:
 
