@@ -12,7 +12,7 @@ The code relies on relevant instrument drivers being installed. Figuring out how
 
 ## Hysteresis_Measurement
 
-Contents: Python source code, batch file to start GUI, icon for batch shortcut and a text file containing default values.
+Contents: Python source code, batch file to start GUI, icon for batch shortcut, text file containing default values and tooltips module.
 
 ### Intrument:
 
@@ -34,7 +34,7 @@ The GUI has graphing capabilities. Graphs can be zoomed into and saved as images
 
 Sampled data can be outputted to a file via a save as dialogue.
 
-Tooltips give helpful hints about how to use the entry fields.
+Tooltips give helpful hints about how to use the entry fields. The tooltips module is built on tkinter.
 
 ## Superconductor_Fields
 
