@@ -1051,10 +1051,9 @@ class HystGUI(tk.Frame):
         for heading in self.plotSelection:
             text += " "+heading
         text += "\n#"
-        text = "#"
         for unit in self.units:
             text += " "+unit
-        text += "\n#"
+        text += "\n"
         
         
         for i in range(len(self.measurements['X'])):
