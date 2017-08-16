@@ -299,7 +299,7 @@ class HystGUI(tk.Frame):
         self.makeDefaultButton.grid(row=3, column=7, sticky=tk.E+tk.W)
         
         # Plot
-        self.plotLabel.grid(row=11, column=0, sticky=tk.W)
+        self.plotLabel.grid(row=12, column=0, sticky=tk.W)
         
         # Horizontal axis
         self.plotxLabel.grid(row=13, column=0, sticky=tk.W)
