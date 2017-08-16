@@ -694,7 +694,7 @@ class HystGUI(tk.Frame):
                 for j in range(numSteps):
                     
                     # Update progress
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+j/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+j/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -716,7 +716,7 @@ class HystGUI(tk.Frame):
                 for j in range(int(numSteps/2)+numSteps%2):
                     
                     # Update progress
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+j/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+j/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -736,7 +736,7 @@ class HystGUI(tk.Frame):
                     
                     # Update progress
                     temp = j-1+int(numSteps/2)+numSteps%2
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+temp/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+temp/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -763,7 +763,7 @@ class HystGUI(tk.Frame):
                 for j in range(int(numSteps/4)+addStep):
                     
                     # Update progress
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+j/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+j/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -788,7 +788,7 @@ class HystGUI(tk.Frame):
                 for j in range(1, int(numSteps/2)+addStep+1):
                     
                     # Update progress
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+(j+temp)/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+(j+temp)/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -813,7 +813,7 @@ class HystGUI(tk.Frame):
                 for j in range(1, int(numSteps/4)+addStep+1):
                     
                     # Update progress
-                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format((i/numLoops+(j+temp)/numSteps)*100)+"%"
+                    self.executeButton['text'] = "Progress: "+"{0:.2f}".format(((i+(j+temp)/numSteps)/numLoops)*100)+"%"
                     self.hystGUI.update()
                     
                     # Calculate bias to apply cont.
@@ -851,7 +851,7 @@ class HystGUI(tk.Frame):
         daq.subscribe(path)
                     
         data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
-
+        
         # Unsubscribe from all paths
         daq.unsubscribe('*')
                     
