@@ -703,7 +703,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                     
     
@@ -725,7 +725,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                 
                 # Calculate Max-Min bias to apply
@@ -745,7 +745,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                     
                     
@@ -772,7 +772,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                     
                 temp += int(numSteps/4)+addStep-1
@@ -797,7 +797,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                     
                 temp += int(numSteps/2)+addStep
@@ -822,7 +822,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
                     self.record_meas(sample)
                     
         # Update progress
@@ -832,7 +832,7 @@ class HystGUI(tk.Frame):
                 
     def bias_zero_samp(self, daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
                        biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags,
-                       poll_return_flat_dict):
+                       poll_return_flat_dict, numLoops):
         
         # Apply Bias
         daq.set([['/%s/auxouts/%d/offset' % (device, probeAux), probeOffset],
@@ -865,6 +865,30 @@ class HystGUI(tk.Frame):
                 
         # Access the demodulator sample using the node's path
         sample = data[path]
+        
+        tries = 1
+        limit = 10
+        while tries < limit and len(sample['timestamp'])<=1:
+            tries += 1
+            
+            path = '/%s/demods/%d/sample' % (device, demod_index)
+            daq.subscribe(path)
+                        
+            data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
+            
+            # Unsubscribe from all paths
+            daq.unsubscribe('*')
+                        
+            # Check that the dictionary returned is non-empty
+            assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
+                    
+            # The data returned is a dictionary of dictionaries that reflects the node's path.
+            # Note, the data could be empty if no data had arrived, e.g., if the demods
+            # were disabled or had demodulator rate 0.
+            assert path in data, "The data dictionary returned by poll has no key `%s`." % path
+                    
+            # Access the demodulator sample using the node's path
+            sample = data[path]
 
         # Check how many seconds of demodulator data were returned by poll.
         # First, get the sampling rate of the device's ADCs, the device clockbase...
@@ -895,8 +919,7 @@ class HystGUI(tk.Frame):
         # Allow 0 V intermissionary settling time
         time.sleep(zeroVInter)
         daq.sync()
-                    
-                    
+        
         # Resubscribe and poll.                
         daq.subscribe(path)
         data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
@@ -914,6 +937,31 @@ class HystGUI(tk.Frame):
                 
         # Access the demodulator sample using the node's path
         sample2 = data[path]
+        
+        # Make sure daq was successfully polled
+        # Sometimes it stalls after reading 1 element, otherwise it normally works
+        tries = 1
+        limit = 10
+        while tries < limit and len(sample2['timestamp'])<=1:
+            tries += 1
+            
+            # Resubscribe and poll.                
+            daq.subscribe(path)
+            data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
+                        
+            # Unsubscribe from all paths
+            daq.unsubscribe('*')
+                        
+            # Check that the dictionary returned is non-empty
+            assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
+                    
+            # The data returned is a dictionary of dictionaries that reflects the node's path.
+            # Note, the data could be empty if no data had arrived, e.g., if the demods
+            # were disabled or had demodulator rate 0.
+            assert path in data, "The data dictionary returned by poll has no key `%s`." % path
+                    
+            # Access the demodulator sample using the node's path
+            sample2 = data[path]
 
         # Check how many seconds of demodulator data were returned by poll.
         # First, get the sampling rate of the device's ADCs, the device clockbase...
@@ -922,6 +970,8 @@ class HystGUI(tk.Frame):
         # Convert timestamps from ticks to seconds via clockbase.
         sample2['t'] = (sample2['timestamp'] - sample2['timestamp'][0])/clockbase
         sample2['t'] += sample2['t'][1]
+
+            
 
         # Voltages
         sample2['ProbeV'] = np.empty(len(sample2['t']))
