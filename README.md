@@ -16,7 +16,7 @@ Contents: Python source code, batch file to start graphical user interface, icon
 
 ### Intrument:
 
-ZI HF2LI LIA. 
+ZI HF2LI LIA
 
 ### Description:
 
