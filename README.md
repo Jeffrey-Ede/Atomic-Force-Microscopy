@@ -1,5 +1,5 @@
 # Atomic-Force-Microscopy
-Programmatic atomic force microscrope system control. The code controls lock-in amplifiers (LIAs) and the superconducting magnetic coils.
+Programmatic atomic force microscrope system control. The code controls lock-in amplifiers (LIAs) and superconducting magnetic coils.
 
 This work was carried out under the supervision of Dr Dong Jik Kim in professor Marin Alexe's Electronic Functional Materials research group at the University of Warwick.
 
