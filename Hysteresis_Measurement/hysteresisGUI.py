@@ -215,7 +215,7 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.zeroVInterEntry, "Settling time before measurement at 0V.")
         tooltip.createToolTip(self.numStepsEntry, "Number of bias steps, not including the 0th.")
         tooltip.createToolTip(self.numLoopsEntry, "Number of times to repeat.")
-        tooltip.createToolTip(self.patternEntry, "Bias offseting pattern. Tip: switch the min and max biases\nfor the probe and bottom electrode to flip the pattern.")
+        tooltip.createToolTip(self.patternEntry, "Bias offsetting pattern. Tip: switch the min and max biases\nfor the probe and bottom electrode to flip the pattern.")
         tooltip.createToolTip(self.probeAuxEntry, "Auxillary output supplying probe bias offset\nAdd it to the signal output to the probe.")
         tooltip.createToolTip(self.botElectAuxEntry, "Auxillary output supplying bottom electrode bias offset.")
         tooltip.createToolTip(self.executeButton, "Take hysteresis measurements.")
