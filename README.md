@@ -125,3 +125,21 @@ Highly customisable sweeper. It can sweep over 5 paramters and lock into 17. Can
 ### Features
 
 Designed to be easily wired to the Resonance VI.
+
+## Other
+
+Contents: 2 helpful ZI examples and unused GUI code.
+
+### Instrument
+
+ZI HF2LI LIA
+
+### Description
+
+2 ZI examples that were useful when programming the LIA. Most programs can be written using these as a base to control the LIA.
+
+2 GUIs in development for non-DFRT PFM and DFRT PFM. These features can be controlled via ziControl so the GUIs won't be useful unless they are part of a larger framework that extends ziControl functionality. 
+
+### Features
+
+GUIs have similar structures so it is easy to set up inheritance from a superclass. For instance, that contains the input testing methods.
