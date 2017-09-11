@@ -50,12 +50,12 @@ class HystGUI(tk.Frame):
         self.default = hystDefaultVal.read().splitlines()
         hystDefaultVal.close()
 
-        self.plotSelection = ('X', 'Y', 'R', 'Phase', 't', 'ProbeV', 'BotElectV', 'TotalV')
-        self.units = ('V', 'V', 'V', 'Rad', 's', 'V', 'V', 'V')
+        self.plotSelection = ('TotalV', 'X', 'Y', 'R', 'Phase', 't', 'ProbeV', 'BotElectV')
+        self.units = ('V', 'V', 'V', 'V', 'Rad', 's', 'V', 'V')
                 
         # Dictionary storing measurements
-        self.measurements = {'X': np.empty((0)), 'Y': np.empty((0)), 'R': np.empty((0)), 'Phase': np.empty((0)),
-                             't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0)), 'TotalV': np.empty((0))} 
+        self.measurements = {'TotalV': np.empty((0)), 'X': np.empty((0)), 'Y': np.empty((0)), 'R': np.empty((0)), 'Phase': np.empty((0)),
+                             't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0))} 
 
 
         """
@@ -683,6 +683,23 @@ class HystGUI(tk.Frame):
         poll_flags=0
         poll_return_flat_dict=True
         
+        # Prepare graph to dynamically display measurements as they are taken
+        self.plot = tk.Tk()
+        
+        # Initialise figure
+        
+        f = Figure(figsize=(5, 4), dpi=100)
+        self.a = f.add_subplot(111)
+        
+        # Add a tk.DrawingArea
+        self.canvas = FigureCanvasTkAgg(f, master=self.plot)
+        self.canvas.show()
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
+        toolbar = NavigationToolbar2TkAgg(self.canvas, self.plot)
+        toolbar.update()
+        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
         for i in range(numLoops):
             
             if pattern == 'Min-Max':
@@ -1010,6 +1027,33 @@ class HystGUI(tk.Frame):
         self.measurements['BotElectV'] = np.append(self.measurements['BotElectV'], sample['BotElectV'])
         self.measurements['TotalV'] = np.append(self.measurements['TotalV'], sample['ProbeV']-sample['BotElectV'])
         
+        # Update graph
+        self.update_graph()
+        
+    # Live display of measurements as they are taken
+    def update_graph(self):
+        x1 = self.plotxEntry.get()
+        y1 = self.plotyEntry.get()
+        
+        self.plot.title(x1+"-"+y1+" Plot")
+        
+        self.a.clear()
+        
+        x, y = self.measurements[x1], self.measurements[y1]
+        # Average over repeated values, if specified
+        if self.avgRepeatedx.get() == 1:
+            y, x = self.avg_xrepeats(self.measurements[y1], self.measurements[x1])
+        if self.avgRepeatedy.get() == 1:
+            x, y = self.avg_xrepeats(self.measurements[x1], self.measurements[y1])
+        
+        # Update graph
+        self.a.plot(x, y)
+        
+        # Update canvas
+        self.canvas.draw()
+
+        self.plot.update()
+        
         
     # Clear measurements dictionary
     def clear_meas(self):
@@ -1089,30 +1133,30 @@ class HystGUI(tk.Frame):
                 if i == len(x)-1:
                     avgedx = np.append(avgedx, x[i])
                     avgedy = np.append(avgedy, y[i])
-                    
-        print(len(x), len(y), len(avgedx), len(avgedy))
+
         return avgedx, avgedy
         
     
     # Output data
     def output_data(self):
         
-        text = "#"
+        text = ""
         for heading in self.plotSelection:
             text += " "+heading
-        text += "\n#"
+        text += "\n"
+        
         for unit in self.units:
             text += " "+unit
         text += "\n"
         
-        
+        # Print data to file
         for i in range(len(self.measurements['X'])):
             for key in self.measurements:
                 text += str(self.measurements[key][i])+"    "
             text += "\n"
         
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".txt")
-        if f is None: # asksaveasfile return `None` if dialog closed with "cancel".
+        if f is None: # asksaveasfile returns `None` if dialog closed with 'cancel'.
             return
         f.write(text)
         f.close()     
