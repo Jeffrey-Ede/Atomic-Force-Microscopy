@@ -1,2 +1,0 @@
- TotalV X Y R Phase t ProbeV BotElectV
- V V V V Rad s V V
