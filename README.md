@@ -36,6 +36,10 @@ Sampled data can be outputted to a file via a save as dialogue.
 
 Tooltips give helpful hints about how to use the entry fields. The tooltips module is built on tkinter.
 
+Graph displays measurements as they are taken. Its axes can be changed via the main (green) interface during measurement.
+
+Repeated data points can be averaged before display or data is saved.
+
 ## Superconductor_Fields
 
 Contents: Labview virtual instruments
