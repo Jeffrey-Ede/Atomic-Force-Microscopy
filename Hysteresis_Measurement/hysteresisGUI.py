@@ -225,7 +225,7 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.plotyEntry, "Plot on vertical axis of graph.")
         tooltip.createToolTip(self.plotButton, "Plot graph.")
         tooltip.createToolTip(self.clearPlotButton, "Clear data.")
-        tooltip.createToolTip(self.saveButton, "Opens save as dialogue.\nDefault: .txt")
+        tooltip.createToolTip(self.saveButton, "Opens save as dialogue.\nDefault: .txt\nAverages over repeats first if Avg Horiz or Avg Vert are\nticked. If both are ticked, only Horiz will be averaged over.")
         tooltip.createToolTip(self.probeOutEntry, "Probe signal output.")
         tooltip.createToolTip(self.avgRepeatedxEntry, "Average repeated horizontal values in plot.")
         tooltip.createToolTip(self.avgRepeatedyEntry, "Average repeated vertical values in plot.")
@@ -1149,17 +1149,79 @@ class HystGUI(tk.Frame):
             text += " "+unit
         text += "\n"
         
-        # Print data to file
-        for i in range(len(self.measurements['X'])):
-            for key in self.measurements:
-                text += str(self.measurements[key][i])+"    "
-            text += "\n"
+#        if self.avgRepeatedx.get() == 1:
+#            y, x = self.avg_xrepeats(self.measurements[y1], self.measurements[x1])
+
+        # Average over repeating values and print to file
+        x_get = self.avgRepeatedx.get()
+        if x_get == 1 or self.avgRepeatedy.get() == 1:
+            
+            # Average over x if both x and y averaging are ticked. 
+            if x_get == 1:
+                x_axis = self.plotxEntry.get()
+            else:
+                x_axis = self.plotyEntry.get()
+            
+            total = [0 for meas in self.measurements] # Sums of values to average over initially 0            
+            start, end = 0, 1   # Average between y[start] and y[end] so x and y have same lengths
+            prevx = self.measurements[x_axis][0]
+    
+            # If the next value of x is not the same as the previous, add data to the array
+            for i in range(1, len(self.measurements[x_axis])):
+                # If x is same as previous
+                if self.measurements[x_axis][i] == prevx:
+                    end += 1
+                        
+                    # Check if this is the last element of the array
+                    if i == len(self.measurements[x_axis])-1:
+                        # Add averages to output
+                        for k, key in enumerate(self.measurements):
+                            if key == x_axis:
+                                text += str(prevx) + "    "
+                            else:
+                                for j in range(start, end):                              
+                                    total[k] += self.measurements[key][i]
+                                text += str(total[k]/(end-start)) + "    "
+                        text += "\n"
+                            
+                        
+                # If x is not the same as previous
+                else:
+                    print(1)
+                    for k, key in enumerate(self.measurements):
+                        if key == x_axis:
+                            print(2)
+                            text += str(prevx) + "    "
+                            prevx = self.measurements[x_axis][i]
+                        else:
+                            print(3)
+                            for j in range(start, end):                              
+                                total[k] += self.measurements[key][j]
+                            text += str(total[k]/(end-start)) + "    "
+                    text += "\n"
+                        
+                    for l in range(len(total)):
+                        total[l] = 0
+                    start, end = i, i+1
+                        
+                    # Check if this is the last element of the array
+                    if i == len(self.measurements[x_axis])-1:
+                        for key in self.measurements:
+                            text += str(self.measurements[key][i]) + "    "
+                        text += "\n"
         
+        else:
+            # Print data to file
+            for i in range(len(self.measurements['X'])):
+                for key in self.measurements:
+                    text += str(self.measurements[key][i])+"    "
+                text += "\n"
+            
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".txt")
         if f is None: # asksaveasfile returns `None` if dialog closed with 'cancel'.
             return
         f.write(text)
-        f.close()     
+        f.close()
             
 
 if __name__ == "__main__":
