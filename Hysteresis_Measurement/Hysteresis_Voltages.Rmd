@@ -1,0 +1,328 @@
+---
+runtime: shiny
+output:
+  html_document: default
+---
+
+#Hysteresis Measurement Voltage Trains
+
+This a short overview of the parameters used to decribe hysteresis measurement voltage trains in my [hysteresis measurement API](https://github.com/Jeffrey-Ede/Atomic-Force-Microscopy/tree/master/Hysteresis_Measurement). I've upgraded the upstairs AFM's TestPoint CFM code so that it supports similar functionality.
+
+
+## Train Times
+
+There are 4 times used to describe the voltage trains:
+
+1. <span style="color:blue">0V Wait</span>: A time delay where the bias is 0V but no measurements are taken. It used to give the system or voltage time to settle.
+
+2. <span style="color:magenta">0V Time</span>: Time for which measurements will be taken at 0V.
+
+3. <span style="color:green">Bias Wait</span>: A time delay where the next bias is applied but no measurements are taken. It used to give the system or voltage time to settle.
+
+4. <span style="color:red">Bias Time</span>: Time for which measurements will be taken while a bias is applied.
+
+
+```{python, engine.path='py', echo=FALSE}
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 4))
+
+# Label axes
+ax.set_xlabel('Time')
+ax.set_ylabel('Voltage')
+
+# Remove number and ticks from axes
+ax.get_xaxis().set_ticks([])
+ax.get_yaxis().set_ticks([])
+
+# Create graph
+ax.plot([0, 2], [0, 0], 'b')
+ax.plot([2, 7], [0, 0], 'm')
+ax.plot([7, 7], [0, 4], 'k')
+ax.plot([7, 10], [4, 4], 'g')
+ax.plot([10, 15], [4, 4], 'r')
+ax.plot([15, 15], [4, 0], 'k')
+ax.plot([15, 17], [0, 0], 'b')
+ax.plot([17, 22], [0, 0], 'm')
+ax.plot([22, 22], [0, 8], 'k')
+ax.plot([22, 25], [8, 8], 'g')
+ax.plot([25, 30], [8, 8], 'r')
+ax.plot([30, 30], [8, 0], 'k')
+ax.plot([30, 32], [0, 0], 'b')
+ax.plot([32, 37], [0, 0], 'm')
+
+# Create Legend
+zeroVWait = mpatches.Patch(color='b', label='0V Wait')
+zeroVTime = mpatches.Patch(color='m', label='0V Time')
+biasWait = mpatches.Patch(color='g', label='Bias Wait')
+biasTime = mpatches.Patch(color='r', label='Bias Time')
+plt.legend(handles=[zeroVWait, zeroVTime, biasWait, biasTime])
+
+#fig.savefig('foo.png', bbox_inches='tight')
+
+```
+
+![](foo.png)
+
+Wait times can be used to deliberately apply a voltage without taking measurements. This could useful when studying remnant effects of a bias as measurements taken under bias may be uninteresting.
+
+## Train Shapes
+
+This Shiny application allows you to simulate voltage trains.
+
+```{r echo = FALSE}
+shinyUI(fluidPage(
+
+  sidebarLayout(
+
+    sidebarPanel(
+      
+      
+      # inputs
+      selectInput("pattern", label = "Pattern",
+                    choices = c("Min-Max", "Min-Max-Min", "0-Max-0-Min-0"), selected = "Min-Max"),
+      textInput("num_steps", label="Steps", value = 10, width = NULL, placeholder = 10),
+      textInput("min_volt", label="Min Bias (V)", value = -5.0, width = NULL, placeholder = -5.0),
+      textInput("max_volt", label="Max Bias (V)", value = 5.0, width = NULL, placeholder = 5.0),
+      textInput("zeroVWait", label="0V Wait (ms)", value = 10, width = NULL, placeholder = 10),
+      textInput("zeroVTime", label="0V Time (ms)", value = 50, width = NULL, placeholder = 50),
+      textInput("biasWait", label="Bias Wait (ms)", value = 10, width = NULL, placeholder = 10),
+      textInput("biasTime", label="Bias Time (ms)", value = 50, width = NULL, placeholder = 50)
+      
+    ),
+    
+    
+    mainPanel(
+      output$plot <- renderPlot({
+          # Get input parameters
+          num_steps <- as.numeric(input$num_steps)
+          min_volt <- as.numeric(input$min_volt)
+          max_volt <- as.numeric(input$max_volt)
+          zeroVWait <- as.numeric(input$zeroVWait)
+          zeroVTime <- as.numeric(input$zeroVTime)
+          biasWait <- as.numeric(input$biasWait)
+          biasTime <- as.numeric(input$biasTime)
+          
+          # Simulate Min-Max hysteresis voltage train
+          if(input$pattern == "Min-Max"){
+            
+            t <- vector(,4*(num_steps+1))
+            v <-vector(,4*(num_steps+1))
+            
+            volt_incr <- (max_volt-min_volt)/num_steps
+            
+            # After bias wait
+            t[1] <- biasWait; v[1] <- min_volt
+            
+            # After bias time
+            t[2] <- t[1]+biasTime; v[2] <- min_volt
+            
+            # After 0V wait
+            t[3] <- t[2]+zeroVWait; v[3] <- 0
+            
+            # After oV time
+            t[4] <- t[3]+zeroVTime; v[4] <- 0
+              
+            for(i in 1:num_steps){
+              # After bias wait
+              t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- min_volt + i*volt_incr
+              
+              # After bias time
+              t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- min_volt + i*volt_incr
+              
+              # After 0V wait
+              t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
+              
+              # After oV time
+              t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
+            }
+            
+            # Plot simulation
+            plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+            lines(t, v, type="l")
+            
+          }else{
+            if(input$pattern=="Min-Max-Min"){
+              
+              t <- vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
+              v <-vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
+              
+              volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+              
+              # After bias wait
+              t[1] <- biasWait; v[1] <- min_volt
+              
+              # After bias time
+              t[2] <- t[1]+biasTime; v[2] <- min_volt
+              
+              # After 0V wait
+              t[3] <- t[2]+zeroVWait; v[3] <- 0
+              
+              # After oV time
+              t[4] <- t[3]+zeroVTime; v[4] <- 0
+                
+              for(i in 1:(as.integer(num_steps/2)-1)){
+                # After bias wait
+                t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- min_volt + i*volt_incr
+                
+                # After bias time
+                t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- min_volt + i*volt_incr
+                
+                # After 0V wait
+                t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
+                
+                # After oV time
+                t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
+              }
+              
+              l_idx <- 4*(as.integer(num_steps/2))
+              
+              volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+              
+              for(i in 0:(as.integer(num_steps/2)+num_steps%%2)){
+                # After bias wait
+                t[4*i+1+l_idx] <- t[4*i+l_idx]+biasWait; v[4*i+1+l_idx] <- max_volt - i*volt_incr
+                
+                # After bias time
+                t[4*i+2+l_idx] <- t[4*i+1+l_idx]+biasTime; v[4*i+2+l_idx] <- max_volt - i*volt_incr
+                
+                # After 0V wait
+                t[4*i+3+l_idx] <- t[4*i+2+l_idx]+zeroVWait; v[4*i+3+l_idx] <- 0
+                
+                # After oV time
+                t[4*i+4+l_idx] <- t[4*i+3+l_idx]+zeroVTime; v[4*i+4+l_idx] <- 0
+              }
+              
+              # Plot simulation
+              plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+              lines(t, v, type="l")
+              
+            }else{
+              if(input$pattern=="0-Max-0-Min-0"){
+                
+                t <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                v <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                
+                addStep <- 0
+                if((num_steps+1)%%4 > 0){
+                  addStep <- 1
+                }
+                
+                volt_incr <- max_volt/(as.integer((num_steps+1)/4)+addStep-1)
+                
+                # After bias wait
+                t[1] <- biasWait; v[1] <- 0
+                
+                # After bias time
+                t[2] <- t[1]+biasTime; v[2] <- 0
+                
+                # After 0V wait
+                t[3] <- t[2]+zeroVWait; v[3] <- 0
+                
+                # After oV time
+                t[4] <- t[3]+zeroVTime; v[4] <- 0
+                  
+                for(i in 1:(as.integer((num_steps+1)/4)+addStep-1)){
+                  # After bias wait
+                  t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- i*volt_incr
+                  
+                  # After bias time
+                  t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- i*volt_incr
+                  
+                  # After 0V wait
+                  t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
+                  
+                  # After oV time
+                  t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
+                }
+                
+                l_idx <- 4*(as.integer((num_steps+1)/4)+addStep)
+                
+                if((num_steps+1)%%4 > 1){
+                  addStep <- 1
+                }else{
+                  addStep <- 0
+                }
+                
+                volt_incr <- (max_volt-min_volt)/(as.integer((num_steps+1)/2)+addStep)
+                
+                for(i in 1:(as.integer((num_steps+1)/2)+addStep)){
+                  # if(i == 1){
+                  #   updateTextInput(session, "inText", value = paste("New text", l_idx))
+                  # }
+                  # After bias wait
+                  t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- max_volt - i*volt_incr
+                  
+                  # After bias time
+                  t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- max_volt - i*volt_incr
+                  
+                  # After 0V wait
+                  t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
+                  
+                  # After oV time
+                  t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
+                }
+                
+                l_idx <- l_idx + 4*(as.integer((num_steps+1)/2)+addStep)
+                
+                if((num_steps+1)%%4 > 2){
+                  addStep <- 1
+                }else{
+                  addStep <- 0
+                }
+                
+                volt_incr <- -min_volt/(as.integer((num_steps+1)/4)+addStep)
+                
+                for(i in 1:(as.integer((num_steps+1)/4)+addStep)){
+                  # After bias wait
+                  t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- min_volt + i*volt_incr
+                  
+                  # After bias time
+                  t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- min_volt + i*volt_incr
+                  
+                  # After 0V wait
+                  t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
+                  
+                  # After oV time
+                  t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
+                }
+                
+                # Plot simulation
+                plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+                lines(t, v, type="l")
+              }
+            }
+          }
+        }, height = 680, width = 600)
+    )
+    )
+  )
+)
+
+```
+
+The following special cases may be useful.
+
+### Constant Voltage
+
+Set the maximum and minimum voltage to the same value to get a constant voltage
+
+Measurements will stil only be taken during 0V Time and Bias Time. This means the voltage will be applied for a total time of `r renderText(as.numeric(input$num_steps)*(as.numeric(input$zeroVWait)+as.numeric(input$zeroVTime)+as.numeric(input$biasWait)+as.numeric(input$biasTime)))` ms: the sum of the 0V Wait, 0V Time, Bias Wait and Bias Time multiplied by the number of steps, whereas measurements will be taken for `r renderText(as.numeric(input$num_steps)*(as.numeric(input$zeroVTime)+as.numeric(input$biasTime)))` ms: the sum of the 0V Time and Bias Time multiplied by the number of steps. 
+
+### Measurement and Waiting Time
+
+Measurements are taken during the 0V Time and Bias Time and not taken during the 0V Wait and Bias Wait. To simulate always taking measurements set the 0V Wait and Bias Wait to 0 ms.
+
+### Sweep Direction
+
+Swapping Min Bias and Max Bias reverses the voltage sweep direction from what it was previously. Using Min Bias > Max Bias produces patterns with a max-min, max-min-max or 0-min-0-max-0, rather than min-max, min-max-min or 0-max-0-min-0, appearance.
+
+### No 0 V Time
+
+Setting 0V Wait and 0V Time to 0 ms will stop the voltage from falling to 0 V between voltage increases.
+
+### Smooth Voltage Sweep
+
+A "No 0 V Time" voltage sweep can be smoothed towards a less stepwise profile by increasing the number of steps. Decrease the bias times proportionally to maintain the same sweep time.
+
