@@ -27,6 +27,8 @@ from matplotlib.figure import Figure
 
 import tooltip
 
+import webbrowser
+
 class HystGUI(tk.Frame):
 
     # Initialise main window
@@ -57,6 +59,7 @@ class HystGUI(tk.Frame):
         self.measurements = {'TotalV': np.empty((0)), 'X': np.empty((0)), 'Y': np.empty((0)), 'R': np.empty((0)), 'Phase': np.empty((0)),
                              't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0))} 
 
+        self.helpPageURL = 'https://jeffrey-ede.shinyapps.io/voltage_trains/'
 
         """
         1. Initialise all data entry terminals, labels, etc.
@@ -203,6 +206,9 @@ class HystGUI(tk.Frame):
         self.demodUnit = tk.Label(self.hystGUI, text="", bg=self.backClr)
         self.demodEntry = tk.ttk.Combobox(self.hystGUI, values=self.demods)
         
+        # Help
+        self.helpButton = tk.Button(self.hystGUI, text='Help', command=self.helpPage, bg=self.btnClr)
+        
         # Tooltips
         # Probe max DC Offset
         tooltip.createToolTip(self.probeMaxDCEntry, "Probe max bias offset.\nLimits: ±10V")
@@ -229,6 +235,7 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.probeOutEntry, "Probe signal output.")
         tooltip.createToolTip(self.avgRepeatedxEntry, "Average repeated horizontal values in plot.")
         tooltip.createToolTip(self.avgRepeatedyEntry, "Average repeated vertical values in plot.")
+        tooltip.createToolTip(self.helpButton, "Opens voltage train simulation and\nparameter explanation in browser.")
         
 
         ###################################################
@@ -333,6 +340,8 @@ class HystGUI(tk.Frame):
         self.demodLabel.grid(row=9, column=0, sticky=tk.W)
         self.demodUnit.grid(row=9, column=2, sticky=tk.W)
         self.demodEntry.grid(row=9, column=1, sticky=tk.E+tk.W)
+        
+        self.helpButton.grid(row=4, column=7, sticky=tk.E+tk.W)
         
         # Configure grid spacing
         for row_num in range(self.hystGUI.grid_size()[1]):
@@ -1211,7 +1220,7 @@ class HystGUI(tk.Frame):
                         text += "\n"
         
         else:
-            # Print data to file
+            # Print data to file without averaging repeats
             for i in range(len(self.measurements['X'])):
                 for key in self.measurements:
                     text += str(self.measurements[key][i])+"    "
@@ -1222,6 +1231,9 @@ class HystGUI(tk.Frame):
             return
         f.write(text)
         f.close()
+        
+    def helpPage(self):
+        webbrowser.open(self.helpPageURL, new=2)
             
 
 if __name__ == "__main__":
