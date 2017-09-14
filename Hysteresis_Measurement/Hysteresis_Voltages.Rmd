@@ -21,7 +21,6 @@ There are 4 times used to describe the voltage trains:
 
 4. <span style="color:red">Bias Time</span>: Time for which measurements will be taken while a bias is applied.
 
-
 ```{python, engine.path='py', echo=FALSE}
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -59,13 +58,13 @@ biasWait = mpatches.Patch(color='g', label='Bias Wait')
 biasTime = mpatches.Patch(color='r', label='Bias Time')
 plt.legend(handles=[zeroVWait, zeroVTime, biasWait, biasTime])
 
-#fig.savefig('foo.png', bbox_inches='tight')
+fig.savefig('foo.png', bbox_inches='tight')
 
 ```
 
 ![](foo.png)
 
-Wait times can be used to deliberately apply a voltage without taking measurements. This could useful when studying remnant effects of a bias as measurements taken under bias may be uninteresting.
+Wait times can be used to deliberately apply a voltage without taking measurements. This could useful when studying remnant effects of a bias as measurements taken under the bias may be uninteresting.
 
 ## Train Shapes
 
@@ -94,6 +93,8 @@ shinyUI(fluidPage(
     
     
     mainPanel(
+      selectInput("display", label = "Display",
+                    choices = c("Applied Voltage", "Measurements"), selected = "Applied Voltage"),
       output$plot <- renderPlot({
           # Get input parameters
           num_steps <- as.numeric(input$num_steps)
@@ -107,48 +108,13 @@ shinyUI(fluidPage(
           # Simulate Min-Max hysteresis voltage train
           if(input$pattern == "Min-Max"){
             
-            t <- vector(,4*(num_steps+1))
-            v <-vector(,4*(num_steps+1))
-            
-            volt_incr <- (max_volt-min_volt)/num_steps
-            
-            # After bias wait
-            t[1] <- biasWait; v[1] <- min_volt
-            
-            # After bias time
-            t[2] <- t[1]+biasTime; v[2] <- min_volt
-            
-            # After 0V wait
-            t[3] <- t[2]+zeroVWait; v[3] <- 0
-            
-            # After oV time
-            t[4] <- t[3]+zeroVTime; v[4] <- 0
-              
-            for(i in 1:num_steps){
-              # After bias wait
-              t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- min_volt + i*volt_incr
-              
-              # After bias time
-              t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- min_volt + i*volt_incr
-              
-              # After 0V wait
-              t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
-              
-              # After oV time
-              t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
-            }
-            
             # Plot simulation
-            plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
-            lines(t, v, type="l")
-            
-          }else{
-            if(input$pattern=="Min-Max-Min"){
+            if(input$display == "Measurements"){
               
-              t <- vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
-              v <-vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
+              t <- vector(,4*(num_steps+1))
+              v <-vector(,4*(num_steps+1))
               
-              volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+              volt_incr <- (max_volt-min_volt)/num_steps
               
               # After bias wait
               t[1] <- biasWait; v[1] <- min_volt
@@ -162,7 +128,7 @@ shinyUI(fluidPage(
               # After oV time
               t[4] <- t[3]+zeroVTime; v[4] <- 0
                 
-              for(i in 1:(as.integer(num_steps/2)-1)){
+              for(i in 1:num_steps){
                 # After bias wait
                 t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- min_volt + i*volt_incr
                 
@@ -176,46 +142,87 @@ shinyUI(fluidPage(
                 t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
               }
               
-              l_idx <- 4*(as.integer(num_steps/2))
+              plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+              lines(t, v, type="l")
+            }
+            if(input$display == "Applied Voltage"){
               
-              volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+              t <- vector(,6*(num_steps+1))
+              v <-vector(,6*(num_steps+1))
               
-              for(i in 0:(as.integer(num_steps/2)+num_steps%%2)){
+              volt_incr <- (max_volt-min_volt)/num_steps
+              
+              # Before bias wait
+              t[1] <- 0; v[1] <- min_volt
+              
+              # After bias wait
+              t[2] <- biasWait; v[2] <- min_volt
+              
+              # After bias time
+              t[3] <- t[2]+biasTime; v[3] <- min_volt
+              
+              # Before 0V wait
+              t[4] <- t[3]; v[4] <- 0
+              
+              # After 0V wait
+              t[5] <- t[4]+zeroVWait; v[5] <- 0
+              
+              # After oV time
+              t[6] <- t[5]+zeroVTime; v[6] <- 0
+                
+              for(i in 1:num_steps){
+                # Before bias wait
+                t[6*i+1] <- t[6*i]; v[6*i+1] <- min_volt + i*volt_incr
+                
                 # After bias wait
-                t[4*i+1+l_idx] <- t[4*i+l_idx]+biasWait; v[4*i+1+l_idx] <- max_volt - i*volt_incr
+                t[6*i+2] <- t[6*i+1]+biasWait; v[6*i+2] <- min_volt + i*volt_incr
                 
                 # After bias time
-                t[4*i+2+l_idx] <- t[4*i+1+l_idx]+biasTime; v[4*i+2+l_idx] <- max_volt - i*volt_incr
+                t[6*i+3] <- t[6*i+2]+biasTime; v[6*i+3] <- min_volt + i*volt_incr
+                
+                # Before 0V wait
+                t[6*i+4] <- t[6*i+3]; v[6*i+4] <- 0
                 
                 # After 0V wait
-                t[4*i+3+l_idx] <- t[4*i+2+l_idx]+zeroVWait; v[4*i+3+l_idx] <- 0
+                t[6*i+5] <- t[6*i+4]+zeroVWait; v[6*i+5] <- 0
                 
                 # After oV time
-                t[4*i+4+l_idx] <- t[4*i+3+l_idx]+zeroVTime; v[4*i+4+l_idx] <- 0
+                t[6*i+6] <- t[6*i+5]+zeroVTime; v[6*i+6] <- 0
               }
               
               # Plot simulation
               plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
-              lines(t, v, type="l")
+              lines(t[1:2], v[1:2], type="l", col="green")
+              lines(t[2:3], v[2:3], type="l", col="red")
+              lines(t[3:4], v[3:4], type="l", col="black")
+              lines(t[4:5], v[4:5], type="l", col="blue")
+              lines(t[5:6], v[5:6], type="l", col="magenta")
+              for(i in 1:num_steps){
+                lines(t[(6*i):(6*i+1)], v[(6*i):(6*i+1)], type="l", col="black")
+                lines(t[(6*i+1):(6*i+2)], v[(6*i+1):(6*i+2)], type="l", col="green")
+                lines(t[(6*i+2):(6*i+3)], v[(6*i+2):(6*i+3)], type="l", col="red")
+                lines(t[(6*i+3):(6*i+4)], v[(6*i+3):(6*i+4)], type="l", col="black")
+                lines(t[(6*i+4):(6*i+5)], v[(6*i+4):(6*i+5)], type="l", col="blue")
+                lines(t[(6*i+5):(6*i+6)], v[(6*i+5):(6*i+6)], type="l", col="magenta")
+              }
               
-            }else{
-              if(input$pattern=="0-Max-0-Min-0"){
+            }
+            
+          }else{
+            if(input$pattern=="Min-Max-Min"){
+              
+              if(input$display == "Measurements"){
+              
+                t <- vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
+                v <-vector(,4*(2*as.integer(num_steps/2)+num_steps%%2+1))
                 
-                t <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
-                v <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
-                
-                addStep <- 0
-                if((num_steps+1)%%4 > 0){
-                  addStep <- 1
-                }
-                
-                volt_incr <- max_volt/(as.integer((num_steps+1)/4)+addStep-1)
+                volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
                 
                 # After bias wait
-                t[1] <- biasWait; v[1] <- 0
+                t[1] <- biasWait; v[1] <- min_volt
                 
                 # After bias time
-                t[2] <- t[1]+biasTime; v[2] <- 0
+                t[2] <- t[1]+biasTime; v[2] <- min_volt
                 
                 # After 0V wait
                 t[3] <- t[2]+zeroVWait; v[3] <- 0
@@ -223,12 +230,12 @@ shinyUI(fluidPage(
                 # After oV time
                 t[4] <- t[3]+zeroVTime; v[4] <- 0
                   
-                for(i in 1:(as.integer((num_steps+1)/4)+addStep-1)){
+                for(i in 1:(as.integer(num_steps/2)-1)){
                   # After bias wait
-                  t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- i*volt_incr
+                  t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- min_volt + i*volt_incr
                   
                   # After bias time
-                  t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- i*volt_incr
+                  t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- min_volt + i*volt_incr
                   
                   # After 0V wait
                   t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
@@ -237,64 +244,333 @@ shinyUI(fluidPage(
                   t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
                 }
                 
-                l_idx <- 4*(as.integer((num_steps+1)/4)+addStep)
+                l_idx <- 4*(as.integer(num_steps/2))
                 
-                if((num_steps+1)%%4 > 1){
-                  addStep <- 1
-                }else{
-                  addStep <- 0
-                }
+                volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
                 
-                volt_incr <- (max_volt-min_volt)/(as.integer((num_steps+1)/2)+addStep)
-                
-                for(i in 1:(as.integer((num_steps+1)/2)+addStep)){
-                  # if(i == 1){
-                  #   updateTextInput(session, "inText", value = paste("New text", l_idx))
-                  # }
+                for(i in 0:(as.integer(num_steps/2)+num_steps%%2)){
                   # After bias wait
-                  t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- max_volt - i*volt_incr
+                  t[4*i+1+l_idx] <- t[4*i+l_idx]+biasWait; v[4*i+1+l_idx] <- max_volt - i*volt_incr
                   
                   # After bias time
-                  t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- max_volt - i*volt_incr
+                  t[4*i+2+l_idx] <- t[4*i+1+l_idx]+biasTime; v[4*i+2+l_idx] <- max_volt - i*volt_incr
                   
                   # After 0V wait
-                  t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
+                  t[4*i+3+l_idx] <- t[4*i+2+l_idx]+zeroVWait; v[4*i+3+l_idx] <- 0
                   
                   # After oV time
-                  t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
-                }
-                
-                l_idx <- l_idx + 4*(as.integer((num_steps+1)/2)+addStep)
-                
-                if((num_steps+1)%%4 > 2){
-                  addStep <- 1
-                }else{
-                  addStep <- 0
-                }
-                
-                volt_incr <- -min_volt/(as.integer((num_steps+1)/4)+addStep)
-                
-                for(i in 1:(as.integer((num_steps+1)/4)+addStep)){
-                  # After bias wait
-                  t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- min_volt + i*volt_incr
-                  
-                  # After bias time
-                  t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- min_volt + i*volt_incr
-                  
-                  # After 0V wait
-                  t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
-                  
-                  # After oV time
-                  t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
+                  t[4*i+4+l_idx] <- t[4*i+3+l_idx]+zeroVTime; v[4*i+4+l_idx] <- 0
                 }
                 
                 # Plot simulation
                 plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
                 lines(t, v, type="l")
               }
+              if(input$display == "Applied Voltage"){
+                
+                t <- vector(,6*(2*as.integer(num_steps/2)+num_steps%%2+1))
+                v <-vector(,6*(2*as.integer(num_steps/2)+num_steps%%2+1))
+                
+                volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+                
+                # Before bias wait
+                t[1] <- 0; v[1] <- min_volt
+                
+                # After bias wait
+                t[2] <- biasWait; v[2] <- min_volt
+                
+                # After bias time
+                t[3] <- t[2]+biasTime; v[3] <- min_volt
+                
+                # Before 0V wait
+                t[4] <- t[3]; v[4] <- 0
+                
+                # After 0V wait
+                t[5] <- t[4]+zeroVWait; v[5] <- 0
+                
+                # After oV time
+                t[6] <- t[5]+zeroVTime; v[6] <- 0
+                  
+                for(i in 1:(as.integer(num_steps/2)-1)){
+                  # Before bias wait
+                  t[6*i+1] <- t[6*i]; v[6*i+1] <- min_volt + i*volt_incr
+                  
+                  # After bias wait
+                  t[6*i+2] <- t[6*i+1]+biasWait; v[6*i+2] <- min_volt + i*volt_incr
+                  
+                  # After bias time
+                  t[6*i+3] <- t[6*i+2]+biasTime; v[6*i+3] <- min_volt + i*volt_incr
+                  
+                  # Before 0V wait
+                  t[6*i+4] <- t[6*i+3]; v[6*i+4] <- 0
+                  
+                  # After 0V wait
+                  t[6*i+5] <- t[6*i+4]+zeroVWait; v[6*i+5] <- 0
+                  
+                  # After oV time
+                  t[6*i+6] <- t[6*i+5]+zeroVTime; v[6*i+6] <- 0
+                }
+                
+                l_idx <- 6*(as.integer(num_steps/2))
+                
+                volt_incr <- (max_volt-min_volt)/(as.integer(num_steps/2)+num_steps%%2)
+                
+                for(i in 0:(as.integer(num_steps/2)+num_steps%%2)){
+                  # Before bias wait
+                  t[6*i+1+l_idx] <- t[6*i+l_idx]; v[6*i+1+l_idx] <- max_volt - i*volt_incr
+                  
+                  # After bias wait
+                  t[6*i+2+l_idx] <- t[6*i+1+l_idx]+biasWait; v[6*i+2+l_idx] <- max_volt - i*volt_incr
+                  # After bias time
+                  t[6*i+3+l_idx] <- t[6*i+2+l_idx]+biasTime; v[6*i+3+l_idx] <- max_volt - i*volt_incr
+                  
+                  # Before 0V wait
+                  t[6*i+4+l_idx] <- t[6*i+3+l_idx]; v[6*i+4+l_idx] <- 0
+                  
+                  # After 0V wait
+                  t[6*i+5+l_idx] <- t[6*i+4+l_idx]+zeroVWait; v[6*i+5+l_idx] <- 0
+                  
+                  # After oV time
+                  t[6*i+6+l_idx] <- t[6*i+5+l_idx]+zeroVTime; v[6*i+6+l_idx] <- 0
+                }
+                
+                # Plot simulation
+                plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+                lines(t[1:2], v[1:2], type="l", col="green")
+                lines(t[2:3], v[2:3], type="l", col="red")
+                lines(t[3:4], v[3:4], type="l", col="black")
+                lines(t[4:5], v[4:5], type="l", col="blue")
+                lines(t[5:6], v[5:6], type="l", col="magenta")
+                for(i in 1:(6*(2*as.integer(num_steps/2)+num_steps%%2))){
+                  lines(t[(6*i):(6*i+1)], v[(6*i):(6*i+1)], type="l", col="black")
+                  lines(t[(6*i+1):(6*i+2)], v[(6*i+1):(6*i+2)], type="l", col="green")
+                  lines(t[(6*i+2):(6*i+3)], v[(6*i+2):(6*i+3)], type="l", col="red")
+                  lines(t[(6*i+3):(6*i+4)], v[(6*i+3):(6*i+4)], type="l", col="black")
+                  lines(t[(6*i+4):(6*i+5)], v[(6*i+4):(6*i+5)], type="l", col="blue")
+                  lines(t[(6*i+5):(6*i+6)], v[(6*i+5):(6*i+6)], type="l", col="magenta")
+                }
+              }
+              
+            }else{
+              if(input$pattern=="0-Max-0-Min-0"){
+                
+                if(input$display == "Measurements"){
+                
+                  t <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                  v <- vector(,4*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                  
+                  addStep <- 0
+                  if((num_steps+1)%%4 > 0){
+                    addStep <- 1
+                  }
+                  
+                  volt_incr <- max_volt/(as.integer((num_steps+1)/4)+addStep-1)
+                  
+                  # After bias wait
+                  t[1] <- biasWait; v[1] <- 0
+                  
+                  # After bias time
+                  t[2] <- t[1]+biasTime; v[2] <- 0
+                  
+                  # After 0V wait
+                  t[3] <- t[2]+zeroVWait; v[3] <- 0
+                  
+                  # After oV time
+                  t[4] <- t[3]+zeroVTime; v[4] <- 0
+                    
+                  for(i in 1:(as.integer((num_steps+1)/4)+addStep-1)){
+                    # After bias wait
+                    t[4*i+1] <- t[4*i]+biasWait; v[4*i+1] <- i*volt_incr
+                    
+                    # After bias time
+                    t[4*i+2] <- t[4*i+1]+biasTime; v[4*i+2] <- i*volt_incr
+                    
+                    # After 0V wait
+                    t[4*i+3] <- t[4*i+2]+zeroVWait; v[4*i+3] <- 0
+                    
+                    # After oV time
+                    t[4*i+4] <- t[4*i+3]+zeroVTime; v[4*i+4] <- 0
+                  }
+                  
+                  l_idx <- 4*(as.integer((num_steps+1)/4)+addStep)
+                  
+                  if((num_steps+1)%%4 > 1){
+                    addStep <- 1
+                  }else{
+                    addStep <- 0
+                  }
+                  
+                  volt_incr <- (max_volt-min_volt)/(as.integer((num_steps+1)/2)+addStep)
+                  
+                  for(i in 1:(as.integer((num_steps+1)/2)+addStep)){
+                    t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- max_volt - i*volt_incr
+                    
+                    # After bias time
+                    t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- max_volt - i*volt_incr
+                    
+                    # After 0V wait
+                    t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
+                    
+                    # After oV time
+                    t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
+                  }
+                  
+                  l_idx <- l_idx + 4*(as.integer((num_steps+1)/2)+addStep)
+                  
+                  if((num_steps+1)%%4 > 2){
+                    addStep <- 1
+                  }else{
+                    addStep <- 0
+                  }
+                  
+                  volt_incr <- -min_volt/(as.integer((num_steps+1)/4)+addStep)
+                  
+                  for(i in 1:(as.integer((num_steps+1)/4)+addStep)){
+                    # After bias wait
+                    t[4*i-3+l_idx] <- t[4*i-4+l_idx]+biasWait; v[4*i-3+l_idx] <- min_volt + i*volt_incr
+                    
+                    # After bias time
+                    t[4*i-2+l_idx] <- t[4*i-3+l_idx]+biasTime; v[4*i-2+l_idx] <- min_volt + i*volt_incr
+                    
+                    # After 0V wait
+                    t[4*i-1+l_idx] <- t[4*i-2+l_idx]+zeroVWait; v[4*i-1+l_idx] <- 0
+                    
+                    # After oV time
+                    t[4*i+l_idx] <- t[4*i-1+l_idx]+zeroVTime; v[4*i+l_idx] <- 0
+                  }
+                  
+                  # Plot simulation
+                  plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+                  lines(t, v, type="l")
+                }
+                if(input$display == "Applied Voltage"){
+                  
+                  t <- vector(,6*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                  v <- vector(,6*(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4))
+                  
+                  addStep <- 0
+                  if((num_steps+1)%%4 > 0){
+                    addStep <- 1
+                  }
+                  
+                  volt_incr <- max_volt/(as.integer((num_steps+1)/4)+addStep-1)
+                  
+                  # Before bias wait
+                  t[1] <- 0; v[1] <- 0
+                  
+                  # After bias wait
+                  t[2] <- biasWait; v[2] <- 0
+                  
+                  # After bias time
+                  t[3] <- t[2]+biasTime; v[3] <- 0
+                  
+                  # Before 0V wait
+                  t[4] <- t[3]; v[4] <- 0
+                  
+                  # After 0V wait
+                  t[5] <- t[4]+zeroVWait; v[5] <- 0
+                  
+                  # After oV time
+                  t[6] <- t[5]+zeroVTime; v[6] <- 0
+                  
+                  for(i in 1:(as.integer((num_steps+1)/4)+addStep-1)){
+                    # Before bias wait
+                    t[6*i+1] <- t[6*i]; v[6*i+1] <- i*volt_incr
+                    
+                    # After bias wait
+                    t[6*i+2] <- t[6*i+1]+biasWait; v[6*i+2] <- i*volt_incr
+                    # After bias time
+                    t[6*i+3] <- t[6*i+2]+biasTime; v[6*i+3] <- i*volt_incr
+                    
+                    # Before 0V wait
+                    t[6*i+4] <- t[6*i+3]; v[6*i+4] <- 0
+                    
+                    # After 0V wait
+                    t[6*i+5] <- t[6*i+4]+zeroVWait; v[6*i+5] <- 0
+                    
+                    # After oV time
+                    t[6*i+6] <- t[6*i+5]+zeroVTime; v[6*i+6] <- 0
+                  }
+                  
+                  l_idx <- 6*(as.integer((num_steps+1)/4)+addStep)
+
+                  if((num_steps+1)%%4 > 1){
+                    addStep <- 1
+                  }else{
+                    addStep <- 0
+                  }
+
+                  volt_incr <- (max_volt-min_volt)/(as.integer((num_steps+1)/2)+addStep)
+
+                  for(i in 1:(as.integer((num_steps+1)/2)+addStep)){
+                    # Before bias wait
+                    t[6*i-5+l_idx] <- t[6*i-6+l_idx]; v[6*i-5+l_idx] <- max_volt - i*volt_incr
+
+                    # After bias wait
+                    t[6*i-4+l_idx] <- t[6*i-5+l_idx]+biasWait; v[6*i-4+l_idx] <- max_volt - i*volt_incr
+                    # After bias time
+                    t[6*i-3+l_idx] <- t[6*i-4+l_idx]+biasTime; v[6*i-3+l_idx] <- max_volt - i*volt_incr
+
+                    # Before 0V wait
+                    t[6*i-2+l_idx] <- t[6*i-3+l_idx]; v[6*i-2+l_idx] <- 0
+
+                    # After 0V wait
+                    t[6*i-1+l_idx] <- t[6*i-2+l_idx]+zeroVWait; v[6*i-1+l_idx] <- 0
+
+                    # After oV time
+                    t[6*i+l_idx] <- t[6*i-1+l_idx]+zeroVTime; v[6*i+l_idx] <- 0
+                  }
+
+                  l_idx <- l_idx + 6*(as.integer((num_steps+1)/2)+addStep)
+
+                  if((num_steps+1)%%4 > 2){
+                    addStep <- 1
+                  }else{
+                    addStep <- 0
+                  }
+
+                  volt_incr <- -min_volt/(as.integer((num_steps+1)/4)+addStep)
+
+                  for(i in 1:(as.integer((num_steps+1)/4)+addStep)){
+                    # Before bias wait
+                    t[6*i-5+l_idx] <- t[6*i-6+l_idx]; v[6*i-5+l_idx] <- min_volt + i*volt_incr
+
+                    # After bias wait
+                    t[6*i-4+l_idx] <- t[6*i-5+l_idx]+biasWait; v[6*i-4+l_idx] <- min_volt + i*volt_incr
+                    # After bias time
+                    t[6*i-3+l_idx] <- t[6*i-4+l_idx]+biasTime; v[6*i-3+l_idx] <- min_volt + i*volt_incr
+
+                    # Before 0V wait
+                    t[6*i-2+l_idx] <- t[6*i-3+l_idx]; v[6*i-2+l_idx] <- 0
+
+                    # After 0V wait
+                    t[6*i-1+l_idx] <- t[6*i-2+l_idx]+zeroVWait; v[6*i-1+l_idx] <- 0
+
+                    # After oV time
+                    t[6*i+l_idx] <- t[6*i-1+l_idx]+zeroVTime; v[6*i+l_idx] <- 0
+                  }
+                  
+                  # Plot simulation
+                  plot(t, v, type ="n", xlab="Time (ms)", ylab="Voltage (V)")
+                  lines(t[1:2], v[1:2], type="l", col="green")
+                  lines(t[2:3], v[2:3], type="l", col="red")
+                  lines(t[3:4], v[3:4], type="l", col="black")
+                  lines(t[4:5], v[4:5], type="l", col="blue")
+                  lines(t[5:6], v[5:6], type="l", col="magenta")
+                  
+                  for(i in 1:(2*as.integer((num_steps+1)/4)+as.integer((num_steps+1)/2)+(num_steps+1)%%4)){
+                    lines(t[(6*i):(6*i+1)], v[(6*i):(6*i+1)], type="l", col="black")
+                    lines(t[(6*i+1):(6*i+2)], v[(6*i+1):(6*i+2)], type="l", col="green")
+                    lines(t[(6*i+2):(6*i+3)], v[(6*i+2):(6*i+3)], type="l", col="red")
+                    lines(t[(6*i+3):(6*i+4)], v[(6*i+3):(6*i+4)], type="l", col="black")
+                    lines(t[(6*i+4):(6*i+5)], v[(6*i+4):(6*i+5)], type="l", col="blue")
+                    lines(t[(6*i+5):(6*i+6)], v[(6*i+5):(6*i+6)], type="l", col="magenta")
+                  }
+                }
+              }
             }
           }
-        }, height = 680, width = 600)
+        }, height = 600, width = 600)
     )
     )
   )
