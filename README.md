@@ -40,6 +40,8 @@ Graph displays measurements as they are taken. Its axes can be changed via the m
 
 Repeated data points can be averaged before display or data is saved.
 
+Help button links to online voltage train explanation and simulator.
+
 ## Superconductor_Fields
 
 Contents: Labview virtual instruments
