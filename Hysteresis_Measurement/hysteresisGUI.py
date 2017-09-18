@@ -27,7 +27,9 @@ from matplotlib.figure import Figure
 
 import tooltip
 
-import webbrowser
+import webbrowser # To open link to help web page
+
+import scipy.interpolate as interpolate # Expansion/compression of scoped data
 
 class HystGUI(tk.Frame):
 
@@ -38,6 +40,7 @@ class HystGUI(tk.Frame):
         self.deviceID = 'dev801'
         self.hystGUI.title("Hysteresis Measurement")
         self.backClr = "#a1dbcd"
+        self.cfmClr = "#a1dbcd"
         self.btnClr = "#73c6b6"
         self.hystGUI.configure(background=self.backClr)
         
@@ -45,6 +48,13 @@ class HystGUI(tk.Frame):
         self.auxOuts = ('1', '2', '3', '4')
         self.probeOut = ('1', '2')
         self.demods = ('1', '2', '3', '4', '5', '6')
+        self.cfmIns = ('1', '2')
+        self.scopeTimes = ('210 MS, 10 micro s', '105 MS, 20 micro s', '53 MS, 39 micro s', '26 MS, 78 micro s', '13 MS, 160 micro s',
+                           '6.6 MS, 310 micro s', '3.3 MS, 620 micro s', '1.6 MS, 1.2 ms', '820 kS, 2.5 ms', '410 kS, 5 ms',
+                           '205 kS, 10 ms','103 kS, 20 ms', '51 kS, 40 ms','26 kS, 80 ms','13 kS, 160 ms', '6.4 kS, 320 ms')
+        self.scopeTimes_times = (10.0e-3, 20.0e-3, 39.0e-3, 78.0e-3, 160.0e-3,
+                                 310.0e-3, 620.0e-3, 1.2, 2.5, 5.0,
+                                 10.0, 20.0, 40.0, 80.0, 160.0, 320.0) # self.scopeTimes times in ms
         
         # Read default entry values from file
         self.defaultFile = 'hysteresis_default_values.txt'
@@ -52,12 +62,13 @@ class HystGUI(tk.Frame):
         self.default = hystDefaultVal.read().splitlines()
         hystDefaultVal.close()
 
-        self.plotSelection = ('TotalV', 'X', 'Y', 'R', 'Phase', 't', 'ProbeV', 'BotElectV')
-        self.units = ('V', 'V', 'V', 'V', 'Rad', 's', 'V', 'V')
+        self.plotSelection = ('TotalV', 'X', 'Y', 'R', 'Phase', 't', 'ProbeV', 'BotElectV', 'CFM_V')
+        self.plotOptions = self.plotSelection
+        self.units = ('V', 'V', 'V', 'V', 'Rad', 's', 'V', 'V', 'V')
                 
         # Dictionary storing measurements
         self.measurements = {'TotalV': np.empty((0)), 'X': np.empty((0)), 'Y': np.empty((0)), 'R': np.empty((0)), 'Phase': np.empty((0)),
-                             't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0))} 
+                             't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0)), 'CFM_V': np.empty((0))} 
 
         self.helpPageURL = 'https://jeffrey-ede.shinyapps.io/voltage_trains/'
 
@@ -170,12 +181,12 @@ class HystGUI(tk.Frame):
         # Horizontal axis
         self.plotxLabel = tk.Label(self.hystGUI, text="Horizontal Axis", bg=self.backClr)
         self.plotxUnit = tk.Label(self.hystGUI, text="", bg=self.backClr)
-        self.plotxEntry = tk.ttk.Combobox(self.hystGUI, values=self.plotSelection)
+        self.plotxEntry = tk.ttk.Combobox(self.hystGUI, values=self.plotOptions)
         
         # Vertical axis
         self.plotyLabel = tk.Label(self.hystGUI, text="Vertical Axis", bg=self.backClr)
         self.plotyUnit = tk.Label(self.hystGUI, text="", bg=self.backClr)
-        self.plotyEntry = tk.ttk.Combobox(self.hystGUI, values=self.plotSelection)
+        self.plotyEntry = tk.ttk.Combobox(self.hystGUI, values=self.plotOptions)
         
         # Plot button
         self.plotButton = tk.Button(self.hystGUI, text='New Plot', command=self.plot, bg=self.btnClr)
@@ -209,6 +220,47 @@ class HystGUI(tk.Frame):
         # Help
         self.helpButton = tk.Button(self.hystGUI, text='Help', command=self.helpPage, bg=self.btnClr)
         
+        
+        # CFM
+        self.cfmLabel = tk.Label(self.hystGUI, text="CFM", font=("bold", 10), bg=self.cfmClr)
+        
+        # Do CFM?
+        self.doCFM = tk.IntVar()
+        self.doCFMLabel = tk.Label(self.hystGUI, text="Do CFM", bg=self.cfmClr)
+        self.doCFMEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.doCFM, command=self.cfm_enabled,
+                                         onvalue=1, offvalue=0, bg=self.cfmClr)
+        
+        # Bandwidth limit
+        self.bwLim = tk.IntVar()
+        self.bwLimLabel = tk.Label(self.hystGUI, text="Bandwith Limit", bg=self.cfmClr)
+        self.bwLimEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.bwLim, onvalue=1,
+                                                offvalue=0, bg=self.cfmClr)
+        
+        # Voltage input channel
+        self.cfmInLabel = tk.Label(self.hystGUI, text="Voltage In", bg=self.cfmClr)
+        self.cfmInUnit = tk.Label(self.hystGUI, text="", bg=self.cfmClr)
+        self.cfmInEntry = tk.ttk.Combobox(self.hystGUI, values=self.cfmClr)
+        
+        # Sampling rate
+        self.scopeTimeLabel = tk.Label(self.hystGUI, text="Sampling Rate", bg=self.cfmClr)
+        self.scopeTimeEntry = tk.ttk.Combobox(self.hystGUI, values=self.scopeTimes)
+        
+        # Save full CFM data?
+        self.saveCFM = tk.IntVar()
+        self.saveCFMLabel = tk.Label(self.hystGUI, text="Save All", bg=self.cfmClr)
+        self.saveCFMEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.saveCFM, onvalue=1, 
+                                                offvalue=0, bg=self.cfmClr)
+        
+        # Location to save CFM to
+        self.saveCFMToLabel = tk.Label(self.hystGUI, text="Save To", bg=self.cfmClr)
+        self.saveCFMToEntry = tk.Entry(self.hystGUI)
+        
+        # CFM save location
+        self.saveCFMButton = tk.Button(self.hystGUI, text='Save To', command=self.cfm_save_loc,
+                                         bg=self.btnClr)
+        
+        
+        
         # Tooltips
         # Probe max DC Offset
         tooltip.createToolTip(self.probeMaxDCEntry, "Probe max bias offset.\nLimits: ±10V")
@@ -236,6 +288,13 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.avgRepeatedxEntry, "Average repeated horizontal values in plot.")
         tooltip.createToolTip(self.avgRepeatedyEntry, "Average repeated vertical values in plot.")
         tooltip.createToolTip(self.helpButton, "Opens voltage train simulation and\nparameter explanation in browser.")
+        tooltip.createToolTip(self.doCFMEntry, "Enable CFM.\nNote: this constrains the lower bound of the bias 0V\ntimes to be at least 100ms+sampling time.")
+        tooltip.createToolTip(self.bwLimEntry, "Bandwidth limitings helps avoid antialiasing\neffects caused by subsampling.")
+        tooltip.createToolTip(self.cfmInEntry, "Voltage input used as current proxy.")
+        tooltip.createToolTip(self.scopeTimeEntry, "Scope sampling rate.")
+        tooltip.createToolTip(self.saveCFMEntry, "Save all CFM data after each poll.")
+        tooltip.createToolTip(self.saveCFMToEntry, "Location to save CFM data to.")
+        tooltip.createToolTip(self.saveCFMButton, "Opens save as dialogue.")
         
 
         ###################################################
@@ -306,22 +365,22 @@ class HystGUI(tk.Frame):
         self.makeDefaultButton.grid(row=3, column=7, sticky=tk.E+tk.W)
         
         # Plot
-        self.plotLabel.grid(row=12, column=0, sticky=tk.W)
+        self.plotLabel.grid(row=17, column=0, sticky=tk.W)
         
         # Horizontal axis
-        self.plotxLabel.grid(row=13, column=0, sticky=tk.W)
-        self.plotxUnit.grid(row=13, column=2, sticky=tk.W)
-        self.plotxEntry.grid(row=13, column=1, sticky=tk.E+tk.W)
+        self.plotxLabel.grid(row=18, column=0, sticky=tk.W)
+        self.plotxUnit.grid(row=18, column=2, sticky=tk.W)
+        self.plotxEntry.grid(row=18, column=1, sticky=tk.E+tk.W)
         
         # Vertical axis
-        self.plotyLabel.grid(row=13, column=3, sticky=tk.W)
-        self.plotyUnit.grid(row=13, column=5, sticky=tk.W)
-        self.plotyEntry.grid(row=13, column=4, sticky=tk.E+tk.W)
+        self.plotyLabel.grid(row=18, column=3, sticky=tk.W)
+        self.plotyUnit.grid(row=18, column=5, sticky=tk.W)
+        self.plotyEntry.grid(row=18, column=4, sticky=tk.E+tk.W)
         
         # Plot buttons
-        self.plotButton.grid(row=12, column=7, sticky=tk.E+tk.W)
-        self.clearPlotButton.grid(row=13, column=7, sticky=tk.E+tk.W)
-        self.saveButton.grid(row=14, column=7, sticky=tk.E+tk.W)
+        self.plotButton.grid(row=17, column=7, sticky=tk.E+tk.W)
+        self.clearPlotButton.grid(row=18, column=7, sticky=tk.E+tk.W)
+        self.saveButton.grid(row=19, column=7, sticky=tk.E+tk.W)
         
         # Probe out
         self.probeOutLabel.grid(row=3, column=3, sticky=tk.W)
@@ -329,19 +388,52 @@ class HystGUI(tk.Frame):
         self.probeOutEntry.grid(row=3, column=4, sticky=tk.E+tk.W)
         
         # Average repeated x values
-        self.avgRepeatedxLabel.grid(row=14, column=0, sticky=tk.W)
-        self.avgRepeatedxEntry.grid(row=14, column=1, sticky=tk.W)
+        self.avgRepeatedxLabel.grid(row=19, column=0, sticky=tk.W)
+        self.avgRepeatedxEntry.grid(row=19, column=1, sticky=tk.W)
         
         # Average repeated y values
-        self.avgRepeatedyLabel.grid(row=14, column=3, sticky=tk.W)
-        self.avgRepeatedyEntry.grid(row=14, column=4, sticky=tk.W)
+        self.avgRepeatedyLabel.grid(row=19, column=3, sticky=tk.W)
+        self.avgRepeatedyEntry.grid(row=19, column=4, sticky=tk.W)
         
         # Demodulator
         self.demodLabel.grid(row=9, column=0, sticky=tk.W)
         self.demodUnit.grid(row=9, column=2, sticky=tk.W)
         self.demodEntry.grid(row=9, column=1, sticky=tk.E+tk.W)
         
+        # Help
         self.helpButton.grid(row=4, column=7, sticky=tk.E+tk.W)
+        
+        # CFM
+        self.cfmLabel.grid(row=12, column=0, sticky=tk.W)
+        
+        # Do CFM?
+        self.doCFMLabel.grid(row=13, column=0, sticky=tk.W)
+        self.doCFMEntry.grid(row=13, column=1, sticky=tk.W)
+        
+        # Bandwidth limit
+        self.bwLimLabel.grid(row=15, column=3, sticky=tk.W)
+        self.bwLimEntry.grid(row=15, column=4, sticky=tk.W)
+        
+        # Voltage input channel
+        self.cfmInLabel.grid(row=14, column=0, sticky=tk.W)
+        self.cfmInUnit.grid(row=14, column=2, sticky=tk.W)
+        self.cfmInEntry.grid(row=14, column=1, sticky=tk.E+tk.W)
+        
+        # Duration of full scope shot
+        self.scopeTimeLabel.grid(row=15, column=0, sticky=tk.W)
+        self.scopeTimeEntry.grid(row=15, column=1, sticky=tk.E+tk.W)
+        
+        # Save full CFM data?
+        self.saveCFMLabel.grid(row=13, column=3, sticky=tk.W)
+        self.saveCFMEntry.grid(row=13, column=4, sticky=tk.W)
+        
+        # Location to save CFM to
+        self.saveCFMToLabel.grid(row=14, column=3, sticky=tk.W)
+        self.saveCFMToEntry.grid(row=14, column=4, sticky=tk.E+tk.W)
+        
+        # CFM save location
+        self.saveCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
+        
         
         # Configure grid spacing
         for row_num in range(self.hystGUI.grid_size()[1]):
@@ -349,7 +441,8 @@ class HystGUI(tk.Frame):
             
         for col_num in range(self.hystGUI.grid_size()[0]):
             self.hystGUI.columnconfigure(col_num, pad=5)
-        
+            
+            
         # Set default values
         self.probeMaxDCEntry.insert(0, self.default[0])
         self.probeMinDCEntry.insert(0, self.default[1])
@@ -375,7 +468,18 @@ class HystGUI(tk.Frame):
         self.avgRepeatedx.set(self.default[16])
         self.avgRepeatedy.set(self.default[17])
         self.demodEntry.insert(0, self.default[18])
+        self.doCFM.set(self.default[19])
+        self.bwLim.set(self.default[20])
+        self.cfmInEntry.insert(0, self.default[21])
+        self.scopeTimeEntry.insert(0, self.default[22])
+        self.saveCFM.set(self.default[23])
+        self.saveCFMToEntry.insert(0, self.default[24])
         
+        
+        # Only display available plot options: not CFM data if CFM mode is not enabled
+        if self.default[19] == 1:
+            self.plotOptions = [opt for opt in self.plotSelection if opt != 'CFM_V']
+            
         
     # Tests if entry input is a number
     def testVal(self, inStr, i, acttyp):
@@ -502,14 +606,33 @@ class HystGUI(tk.Frame):
             errText.insert(tk.END, "Pattern is not in "+str(self.scanPatterns)+"\n")
             
         if not self.plotxEntry.get() in self.plotSelection:
-            errText.insert(tk.END, "Horizontal Axis is not in "+str(self.plotSelection)+"\n")
+            errText.insert(tk.END, "Horizontal Axis is not in "+str(self.plotOptions)+"\n")
             
         if not self.plotyEntry.get() in self.plotSelection:
-            errText.insert(tk.END, "Vertical Axis is not in "+str(self.plotSelection)+"\n")
+            errText.insert(tk.END, "Vertical Axis is not in "+str(self.plotOptions)+"\n")
             
         out_channel = self.probeOutEntry.get()
         if not out_channel in self.probeOut:
             errText.insert(tk.END, "Probe output is not in "+str(self.probeOut)+"\n")
+            
+        if not self.cfmInEntry.get() in self.cfmIns:
+            errText.insert(tk.END, "CFM voltage input is not in "+str(self.cfmIns)+"\n")
+            
+        scopeTime = self.scopeTimeEntry.get()
+        if not scopeTime in self.scopeTimes:
+            errText.insert(tk.END, "CFM sampling rate is not in "+str(self.scopeTimes)+"\n")
+            
+        if self.doCFM.get() == 1:
+            time = ''
+            for i, val in enumerate(self.scopeTimes):
+                if val == self.scopeTimeEntry.get():
+                    time = self.scopeTimes_times[i]
+                    
+            if biasTimeEntry < 100+time and biasTimeEntry !=0:
+                errText.insert(tk.END, "Bias time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
+                
+            if zeroVTimeEntry< 100+time and zeroVTimeEntry != 0:
+                errText.insert(tk.END, "0 V time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
             
         demod_index = self.demodEntry.get()
         if not demod_index in self.demods:
@@ -562,6 +685,9 @@ class HystGUI(tk.Frame):
         self.plotyEntry.delete(0, tk.END)
         self.probeOutEntry.delete(0, tk.END)
         self.demodEntry.delete(0, tk.END)
+        self.cfmInEntry.delete(0, tk.END)
+        self.scopeTimeEntry.delete(0, tk.END)
+        self.saveCFMToEntry.delete(0, tk.END)
         
         # Insert defaults into now-cleared entry fields
         self.probeMaxDCEntry.insert(0, self.default[0])
@@ -583,6 +709,12 @@ class HystGUI(tk.Frame):
         self.avgRepeatedx.set(self.default[16])
         self.avgRepeatedy.set(self.default[17])
         self.demodEntry.insert(0, self.default[18])
+        self.doCFM.set(self.default[19])
+        self.bwLim.set(self.default[20])
+        self.cfmInEntry.insert(0, self.default[21])
+        self.scopeTimeEntry.insert(0, self.default[22])
+        self.saveCFM.set(self.default[23])
+        self.saveCFMToEntry.insert(0, self.default[24])
         
     # Make current values default
     def makeDefault(self):
@@ -605,6 +737,12 @@ class HystGUI(tk.Frame):
         self.default[16] = str(self.avgRepeatedx.get())
         self.default[17] = str(self.avgRepeatedy.get())
         self.default[18] = self.demodEntry.get()
+        self.default[19] = str(self.doCFM.get())
+        self.default[20] = str(self.bwLim.get())
+        self.default[21] = self.cfmInEntry.get()
+        self.default[22] = self.scopeTimeEntry.get()
+        self.default[23] = str(self.saveCFM.get())
+        self.default[24] = self.saveCFMToEntry.get()
         
         defaults = open(self.defaultFile, 'w')
         for default in self.default:
@@ -628,17 +766,17 @@ class HystGUI(tk.Frame):
         probeAux = int(hystParam[10])-1   # -1 so indices start at 0
         botElectAux = int(hystParam[11])-1   # -1 so indices start at 0
         pattern = hystParam[12]
-        out_channel = hystParam[13]-1
-        demod_index = hystParam[14]-1
+        out_channel = hystParam[13]-1   # -1 so indices start at 0
+        demod_index = hystParam[14]-1   # -1 so indices start at 0
     
-        apilevel_example = 5  # The API level supported by this example.
+        apilevel = 1  # The API level supported
         # Call a zhinst utility function that returns:
         # - an API session `daq` in order to communicate with devices via the data server.
         # - the device ID string that specifies the device branch in the server's node hierarchy.
         # - the device's discovery properties.
         err_msg = "This example only supports instruments with demodulators."
-        (daq, device, props) = zhinst.utils.create_api_session(device_id, apilevel_example,
-                                                               required_devtype='.*LI|.*IA|.*IS',
+        (daq, device, props) = zhinst.utils.create_api_session(device_id, apilevel,
+                                                               required_devtype='.*LI|.*IA|.*IS&HF2',
                                                                required_err_msg=err_msg)
     
         # Create a base instrument configuration: disable all outputs, demods and scopes.
@@ -649,6 +787,7 @@ class HystGUI(tk.Frame):
         if 'IA' in props['options']:
             general_setting.append(['/%s/imps/*/enable' % device, 0])
         daq.set(general_setting)
+        
         # Perform a global synchronisation between the device and the data server:
         # Ensure that the settings have taken effect on the device before setting
         # the next configuration.
@@ -860,48 +999,71 @@ class HystGUI(tk.Frame):
                        biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags,
                        poll_return_flat_dict, numLoops):
         
+        daq.setInt('/%s/scopes/0/enable' % device, 0)
         # Apply Bias
         daq.set([['/%s/auxouts/%d/offset' % (device, probeAux), probeOffset],
                  ['/%s/auxouts/%d/offset' % (device, botElectAux), botElectOffset]])
         
         # Allow bias intermissionary settling time
-        time.sleep(biasInter)
+        if biasInter != 0.0:
+            time.sleep(biasInter)
+        
+        # Perform a global synchronisation between the device and the data server:
+        # Ensure that 1. the settings have taken effect on the device before issuing
+        # the poll() command and 2. clear the API's data buffers.
         daq.sync()
                     
                     
         # Record data while bias is being applied
         # Unsubscribe from all paths.
         daq.unsubscribe('*')
-                
-        path = '/%s/demods/%d/sample' % (device, demod_index)
-        daq.subscribe(path)
-                    
-        data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
         
-        # Unsubscribe from all paths
-        daq.unsubscribe('*')
-                    
-        # Check that the dictionary returned is non-empty
-        assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
-                
-        # The data returned is a dictionary of dictionaries that reflects the node's path.
-        # Note, the data could be empty if no data had arrived, e.g., if the demods
-        # were disabled or had demodulator rate 0.
-        assert path in data, "The data dictionary returned by poll has no key `%s`." % path
-                
-        # Access the demodulator sample using the node's path
-        sample = data[path]
+        path = '/%s/demods/%d/sample' % (device, demod_index) # Demodulator path
+        path2 = '/%s/scopes/0/wave' % (device) # CFM scope path
+        save_cfm_to = ""
+        scale = 0 # Scaling factor for 16-bit integers returned by CFM scope
         
-        tries = 1
-        limit = 10
-        while tries < limit and len(sample['timestamp'])<=1:
-            tries += 1
+        # Subscribe to scope if performing CFM 
+        if self.doCFM.get() == 1 and biasTime+zeroVTime > 0:
             
-            path = '/%s/demods/%d/sample' % (device, demod_index)
+            # Complete cfm dataset will be save to hard disk
+            fileName = self.saveCFMToEntry.get()
+            save_cfm_to = open(fileName, "a")
+            
+            scope_time = 0
+            for time_idx, rate in enumerate(self.scopeTimes):
+                if self.scopeTimeEntry.get() == rate:
+                    scope_time = time_idx
+                
+            scope_channel = int(self.cfmInEntry.get())-1 # -1 to get channel index rather than name
+            bwLim = self.bwLim.get()
+            
+            scope_settings = [['/%s/scopes/0/channel'         % (device), scope_channel],
+                              ['/%s/scopes/0/trigchannel'     % (device), -1],
+                              #['/%s/scopes/0/triglevel'       % (device), 0.0],
+                              #['/%s/scopes/0/trigholdoff'     % (device), 0.1],
+                              # Enable bandwidth limiting: avoid antialiasing effects due to
+                              # sub-sampling when the scope sample rate is less than the input
+                              # channel's sample rate.
+                              ['/%s/scopes/0/bwlimit'         % (device), bwLim],
+                              # Set the sampling rate.
+                              ['/%s/scopes/0/time'            % (device), scope_time],
+                              # Enable the scope
+                              ['/%s/scopes/0/enable' % device, 1]]
+            
+            daq.set(scope_settings)
+            
+            sigout_range = daq.getDouble('/%s/sigins/%d/range' % (device, scope_channel))
+            scale = sigout_range/(2**15)  # The scope's wave are 16-bit integers
+            
+        if biasTime != 0:
+            
             daq.subscribe(path)
-                        
-            data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
             
+            if self.doCFM.get() == 1:
+                daq.subscribe(path2)
+            
+            data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
             # Unsubscribe from all paths
             daq.unsubscribe('*')
                         
@@ -912,69 +1074,80 @@ class HystGUI(tk.Frame):
             # Note, the data could be empty if no data had arrived, e.g., if the demods
             # were disabled or had demodulator rate 0.
             assert path in data, "The data dictionary returned by poll has no key `%s`." % path
-                    
-            # Access the demodulator sample using the node's path
+            
+            # Initialise samples to avoid unbound local variable errors
             sample = data[path]
-
-        # Check how many seconds of demodulator data were returned by poll.
-        # First, get the sampling rate of the device's ADCs, the device clockbase...
-        clockbase = float(daq.getInt('/%s/clockbase' % device))
+            if self.doCFM.get() == 1:
+                scope_sample = data[path2]
+            
+            tries = 1
+            limit = 10
+            while tries < limit and len(sample['timestamp'])<=1:
+                tries += 1
+                
+                if self.doCFM.get() == 1:
+                    daq.subscribe(path2)
                     
-        # Convert timestamps from ticks to seconds via clockbase.
-        sample['t'] = (sample['timestamp'] - sample['timestamp'][0])/clockbase
-        sample['t'] += sample['t'][1]
-
-        # Voltages
-        sample['ProbeV'] = np.empty(len(sample['t']))
-        sample['ProbeV'].fill(probeOffset)
-        sample['BotElectV'] = np.empty(len(sample['t']))
-        sample['BotElectV'].fill(botElectOffset)
-        sample['TotalV'] = sample['ProbeV']-sample['BotElectV']
+                daq.subscribe(path)
+                            
+                data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
+                
+                # Unsubscribe from all paths
+                daq.unsubscribe('*')
+                            
+                # Check that the dictionary returned is non-empty
+                assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
+                        
+                # The data returned is a dictionary of dictionaries that reflects the node's path.
+                # Note, the data could be empty if no data had arrived, e.g., if the demods
+                # were disabled or had demodulator rate 0.
+                assert path in data, "The data dictionary returned by poll has no key `%s`." % path
+                        
+                # Access the demodulator sample using the node's path
+                sample = data[path]
+                if self.doCFM.get() == 1:
+                    scope_sample = data[path2]
                     
-                    
-        # Calculate the demodulator's magnitude and phase and add them to the dict.
-        sample['R'] = np.abs(sample['x'] + 1j*sample['y'])
-        sample['Phase'] = np.angle(sample['x'] + 1j*sample['y'])
-                    
-                    
-        # Apply 0 V bias between steps
-        daq.set([['/%s/auxouts/%d/offset' % (device, probeAux), 0],
-                 ['/%s/auxouts/%d/offset' % (device, botElectAux), 0]])
+    
+            # Check how many seconds of demodulator data were returned by poll.
+            # First, get the sampling rate of the device's ADCs, the device clockbase...
+            clockbase = float(daq.getInt('/%s/clockbase' % device))
+                        
+            # Convert timestamps from ticks to seconds via clockbase.
+            sample['t'] = (sample['timestamp'] - sample['timestamp'][0])/clockbase
+            sample['t'] += sample['t'][1]
+            
+            # Voltages
+            sample['ProbeV'] = np.empty(len(sample['t']))
+            sample['ProbeV'].fill(probeOffset)
+            sample['BotElectV'] = np.empty(len(sample['t']))
+            sample['BotElectV'].fill(botElectOffset)
+            sample['TotalV'] = sample['ProbeV']-sample['BotElectV']
+                        
+                        
+            # Calculate the demodulator's magnitude and phase and add them to the dict.
+            sample['R'] = np.abs(sample['x'] + 1j*sample['y'])
+            sample['Phase'] = np.angle(sample['x'] + 1j*sample['y'])
+            
+            
+        if zeroVTime+zeroVInter > 0:
+            # Apply 0 V bias between steps
+            daq.set([['/%s/auxouts/%d/offset' % (device, probeAux), 0],
+                     ['/%s/auxouts/%d/offset' % (device, botElectAux), 0]])
                     
                     
         # Allow 0 V intermissionary settling time
-        time.sleep(zeroVInter)
+        if zeroVInter != 0.0:
+            time.sleep(zeroVInter)
         daq.sync()
         
-        # Resubscribe and poll.                
-        daq.subscribe(path)
-        data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
-                    
-        # Unsubscribe from all paths
-        daq.unsubscribe('*')
-                    
-        # Check that the dictionary returned is non-empty
-        assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
-                
-        # The data returned is a dictionary of dictionaries that reflects the node's path.
-        # Note, the data could be empty if no data had arrived, e.g., if the demods
-        # were disabled or had demodulator rate 0.
-        assert path in data, "The data dictionary returned by poll has no key `%s`." % path
-                
-        # Access the demodulator sample using the node's path
-        sample2 = data[path]
-        
-        # Make sure daq was successfully polled
-        # Sometimes it stalls after reading 1 element, otherwise it normally works
-        tries = 1
-        limit = 10
-        while tries < limit and len(sample2['timestamp'])<=1:
-            tries += 1
+        if zeroVTime != 0.0:
             
             # Resubscribe and poll.                
             daq.subscribe(path)
-            data = daq.poll(biasTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
-                        
+            if self.doCFM.get() == 1:
+                daq.subscribe(path2)
+            data = daq.poll(zeroVTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
             # Unsubscribe from all paths
             daq.unsubscribe('*')
                         
@@ -988,42 +1161,188 @@ class HystGUI(tk.Frame):
                     
             # Access the demodulator sample using the node's path
             sample2 = data[path]
-
-        # Check how many seconds of demodulator data were returned by poll.
-        # First, get the sampling rate of the device's ADCs, the device clockbase...
-        clockbase = float(daq.getInt('/%s/clockbase' % device))
-                    
-        # Convert timestamps from ticks to seconds via clockbase.
-        sample2['t'] = (sample2['timestamp'] - sample2['timestamp'][0])/clockbase
-        sample2['t'] += sample2['t'][1]
-
+            if self.doCFM.get() == 1:
+                scope_sample2 = data[path2]
             
-
-        # Voltages
-        sample2['ProbeV'] = np.empty(len(sample2['t']))
-        sample2['ProbeV'].fill(probeOffset)
-        sample2['BotElectV'] = np.empty(len(sample2['t']))
-        sample2['BotElectV'].fill(botElectOffset)
-        sample2['TotalV'] = sample2['ProbeV']-sample2['BotElectV']
-                    
-        # Calculate the demodulator's magnitude and phase and add them to the dict.
-        sample2['R'] = np.abs(sample2['x'] + 1j*sample2['y'])
-        sample2['Phase'] = np.angle(sample2['x'] + 1j*sample2['y'])
-                    
-        sample['x'] = np.append(sample['x'], sample2['x'])
-        sample['y'] = np.append(sample['y'], sample2['y'])
-        sample['R'] = np.append(sample['R'], sample2['R'])
-        sample['Phase'] = np.append(sample['Phase'], sample2['Phase'])
-        sample['t'] = np.append(sample['t'], sample2['t']+sample['t'][-1])
-        sample['ProbeV'] = np.append(sample['ProbeV'], sample2['ProbeV'])
-        sample['BotElectV'] = np.append(sample['BotElectV'], sample2['BotElectV'])
-        sample['TotalV'] = np.append(sample['TotalV'], sample2['TotalV'])
-        
-        return sample
+            # Make sure daq was successfully polled
+            # Sometimes it stalls after reading 1 element, otherwise it normally works
+            tries = 1
+            limit = 10
+            while tries < limit and len(sample2['timestamp'])<=1:
+                tries += 1
                 
+                # Resubscribe and poll.                
+                daq.subscribe(path)
+                data = daq.poll(zeroVTime, poll_timeout, poll_flags, poll_return_flat_dict)   # *1000 for s -> ms
+                
+                if self.doCFM.get() == 1:
+                    daq.subscribe(path2)
+                            
+                # Unsubscribe from all paths
+                daq.unsubscribe('*')
+                            
+                # Check that the dictionary returned is non-empty
+                assert data, "poll() returned an empty data dictionary, did you subscribe to any paths?"
+                        
+                # The data returned is a dictionary of dictionaries that reflects the node's path.
+                # Note, the data could be empty if no data had arrived, e.g., if the demods
+                # were disabled or had demodulator rate 0.
+                assert path in data, "The data dictionary returned by poll has no key `%s`." % path
+                        
+                # Access the demodulator sample using the node's path
+                sample2 = data[path]
+                if self.doCFM.get() == 1:
+                    scope_sample2 = data[path2]
+    
+            # Disable the scope.
+            if self.doCFM.get() == 1:
+                daq.setInt('/%s/scopes/0/enable' % device, 0)
+    
+            # Check how many seconds of demodulator data were returned by poll.
+            # First, get the sampling rate of the device's ADCs, the device clockbase...
+            clockbase = float(daq.getInt('/%s/clockbase' % device))
+                        
+            # Convert timestamps from ticks to seconds via clockbase.
+            sample2['t'] = (sample2['timestamp'] - sample2['timestamp'][0])/clockbase
+            sample2['t'] += sample2['t'][1]
+    
+            # Voltages
+            sample2['ProbeV'] = np.empty(len(sample2['t']))
+            sample2['ProbeV'].fill(probeOffset)
+            sample2['BotElectV'] = np.empty(len(sample2['t']))
+            sample2['BotElectV'].fill(botElectOffset)
+            sample2['TotalV'] = sample2['ProbeV']-sample2['BotElectV']
+                        
+            # Calculate the demodulator's magnitude and phase and add them to the dict.
+            sample2['R'] = np.abs(sample2['x'] + 1j*sample2['y'])
+            sample2['Phase'] = np.angle(sample2['x'] + 1j*sample2['y'])
+            
+        
+        # Amalgamate any CFM data and iterpolate times
+        if self.doCFM.get() == 1:
+            
+            if biasTime != 0.0:
+                
+                # Combine shot trains, saving the scaled scope trains if requested
+                shot_sets = np.empty((0))
+                if self.saveCFM.get() == 1:
+                    # Provide information about biases
+                    save_cfm_to.write("\nProbe Offset\n")
+                    save_cfm_to.write(str(probeOffset)+"\n")
+                    save_cfm_to.write("Bottom Electrode Offset\n")
+                    save_cfm_to.write(str(botElectOffset)+"\n")
+                    
+                    for shot_set in scope_sample:
+                        for key in shot_set:
+                            if key != 'wave':
+                                
+                                save_cfm_to.write(str(key)+"\n")
+                                save_cfm_to.write(str(shot_set[key])+"\n")
+                                    
+                            else:
+                                
+                                save_cfm_to.write("wave\n")
+                                
+                                # Extract and scale the voltages
+                                scaled_shots = scale*shot_set['wave']
+                                for scaled_shot in scaled_shots:
+                                    save_cfm_to.write(str(scaled_shot)+"\n")
+                                    
+                                shot_sets = np.append(shot_sets, scaled_shots)
+                        
+                else:
+                    for shot_set in scope_sample:
+                        scaled_shots = scale*shot_set['wave']
+                        shot_sets = np.append(shot_sets, scaled_shots)
+            
+                
+                # Compress shot train array to same size as other arrays
+                box_size = int(np.ceil(len(shot_sets)/len(sample['t'])))
+                if len(shot_sets)%len(sample['t'])>0:
+                    sample['CFM_V'] = np.zeros(len(sample['t']))
+                    
+                    for i in range(len(sample['t'])-1):
+                        sample['CFM_V'][i] = np.mean(shot_sets[(i*box_size):((i+1)*box_size)])
+                    sample['CFM_V'][len(sample['t'])-1] = np.mean(shot_sets[(box_size*(len(sample['t'])-1)):])
+                    
+                else:
+                    sample['CFM_V'] = np.empty(len(sample['t']))
+                    for i in range(len(sample['t'])):
+                        sample['CFM_V'][i] = np.mean(shot_sets[(i*box_size):((i+1)*box_size)])
+            
+            if zeroVTime != 0.0:
+            
+                # Combine shot trains
+                shot_sets2 = np.empty((0))
+                if self.saveCFM.get() == 1:
+                    # Provide information about biases
+                    save_cfm_to.write("\nProbe Offset\n")
+                    save_cfm_to.write("0\n")
+                    save_cfm_to.write("Bottom Electrode Offset\n")
+                    save_cfm_to.write("0\n")
+                    
+                    for shot_set in scope_sample2:
+                        for key in shot_set:
+                            if key != 'wave':
+                                
+                                save_cfm_to.write(str(key)+"\n")
+                                save_cfm_to.write(str(shot_set[key])+"\n")
+                                
+                            else:
+                                
+                                save_cfm_to.write("wave\n")
+                                
+                                # Extract and scale the voltages
+                                scaled_shots = scale*shot_set['wave']
+                                for scaled_shot in scaled_shots:
+                                    save_cfm_to.write(str(scaled_shot)+"\n")
+                                    
+                                shot_sets2 = np.append(shot_sets2, scaled_shots)
+                        
+                else:
+                    for shot_set in scope_sample2:
+                        scaled_shots = scale*shot_set['wave']
+                        shot_sets2 = np.append(shot_sets2, scaled_shots)
+                
+                    
+                # Compress shot train array to same size as other arrays
+                box_size = int(np.ceil(len(shot_sets2)/len(sample2['t'])))
+                if len(shot_sets2)%len(sample2['t']) > 0:
+                    sample2['CFM_V'] = np.zeros(len(sample2['t']))
+                    
+                    for i in range(len(sample2['t'])-1):
+                        sample2['CFM_V'][i] = np.mean(shot_sets2[(i*box_size):((i+1)*box_size)])
+                    sample2['CFM_V'][len(sample2['t'])-1] = np.mean(shot_sets[(box_size*(len(sample2['t'])-1)):])
+                    
+                else:
+                    sample2['CFM_V'] = np.empty(len(sample2['t']))
+                    for i in range(len(sample2['t'])):
+                        sample2['CFM_V'][i] = np.mean(shot_sets2[(i*box_size):((i+1)*box_size)])
+                        
+                sample['CFM_V'] = np.append(sample['CFM_V'], sample2['CFM_V'])
+                
+                
+        save_cfm_to.close()
+                
+        if biasTime != 0 and zeroVTime != 0.0:
+            
+            sample['x'] = np.append(sample['x'], sample2['x'])
+            sample['y'] = np.append(sample['y'], sample2['y'])
+            sample['R'] = np.append(sample['R'], sample2['R'])
+            sample['Phase'] = np.append(sample['Phase'], sample2['Phase'])
+            sample['t'] = np.append(sample['t'], sample2['t']+sample['t'][-1])
+            sample['ProbeV'] = np.append(sample['ProbeV'], sample2['ProbeV'])
+            sample['BotElectV'] = np.append(sample['BotElectV'], sample2['BotElectV'])
+            sample['TotalV'] = np.append(sample['TotalV'], sample2['TotalV'])
+            
+        if biasTime != 0:
+            return sample
+        if zeroVTime != 0:
+            return sample2
         
     # Record all relevant measurements in dictionary
     def record_meas(self, sample):
+        
         self.measurements['X'] = np.append(self.measurements['X'], sample['x'])
         self.measurements['Y'] = np.append(self.measurements['Y'], sample['y'])
         self.measurements['R'] = np.append(self.measurements['R'], sample['R'])
@@ -1035,6 +1354,9 @@ class HystGUI(tk.Frame):
         self.measurements['ProbeV'] = np.append(self.measurements['ProbeV'], sample['ProbeV'])
         self.measurements['BotElectV'] = np.append(self.measurements['BotElectV'], sample['BotElectV'])
         self.measurements['TotalV'] = np.append(self.measurements['TotalV'], sample['ProbeV']-sample['BotElectV'])
+        
+        if self.doCFM.get() == 1:
+            self.measurements['CFM_V'] =  np.append(self.measurements['CFM_V'], sample['CFM_V'])
         
         # Update graph
         self.update_graph()
@@ -1149,17 +1471,19 @@ class HystGUI(tk.Frame):
     # Output data
     def output_data(self):
         
+        if self.doCFM.get() == 0:
+            headings = [i for i, heading in enumerate(self.plotSelection) if heading != 'CFM_V']
+        else:
+            headings = self.plotSelection
+            
         text = ""
-        for heading in self.plotSelection:
-            text += " "+heading
+        for index in headings:
+            text += " "+self.plotSelection[index]
         text += "\n"
         
-        for unit in self.units:
-            text += " "+unit
+        for index in headings:
+            text += " "+self.units[index]
         text += "\n"
-        
-#        if self.avgRepeatedx.get() == 1:
-#            y, x = self.avg_xrepeats(self.measurements[y1], self.measurements[x1])
 
         # Average over repeating values and print to file
         x_get = self.avgRepeatedx.get()
@@ -1185,6 +1509,8 @@ class HystGUI(tk.Frame):
                     if i == len(self.measurements[x_axis])-1:
                         # Add averages to output
                         for k, key in enumerate(self.measurements):
+                            if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                                continue
                             if key == x_axis:
                                 text += str(prevx) + "    "
                             else:
@@ -1196,14 +1522,13 @@ class HystGUI(tk.Frame):
                         
                 # If x is not the same as previous
                 else:
-                    print(1)
                     for k, key in enumerate(self.measurements):
+                        if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                            continue
                         if key == x_axis:
-                            print(2)
                             text += str(prevx) + "    "
                             prevx = self.measurements[x_axis][i]
                         else:
-                            print(3)
                             for j in range(start, end):                              
                                 total[k] += self.measurements[key][j]
                             text += str(total[k]/(end-start)) + "    "
@@ -1216,6 +1541,8 @@ class HystGUI(tk.Frame):
                     # Check if this is the last element of the array
                     if i == len(self.measurements[x_axis])-1:
                         for key in self.measurements:
+                            if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                                continue
                             text += str(self.measurements[key][i]) + "    "
                         text += "\n"
         
@@ -1223,6 +1550,8 @@ class HystGUI(tk.Frame):
             # Print data to file without averaging repeats
             for i in range(len(self.measurements['X'])):
                 for key in self.measurements:
+                    if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                        continue
                     text += str(self.measurements[key][i])+"    "
                 text += "\n"
             
@@ -1232,9 +1561,41 @@ class HystGUI(tk.Frame):
         f.write(text)
         f.close()
         
+        
+    # Location to save CFM data to
+    def cfm_save_loc(self):
+        f = tk.filedialog.asksaveasfilename()
+        f.replace("\\", "/")
+        self.default[24] = f
+        self.saveCFMToEntry.delete(0, tk.END)
+        self.saveCFMToEntry.insert(0, f)
+        
+        
+    # Interactive simulation to help user understand voltage train times
     def helpPage(self):
         webbrowser.open(self.helpPageURL, new=2)
             
+    
+    # If CFM is enabled show CFM data plot option, else remove it
+    def cfm_enabled(self):
+        if self.doCFM.get() == 1:
+            self.plotOptions = self.plotSelection
+        else:
+            self.plotOptions = [opt for opt in self.plotSelection if opt != 'CFM_V']
+            
+            if self.plotxEntry.get() == 'CFM_V':
+                # Change value to first on list
+                self.plotxEntry.delete(0, tk.END)
+                self.plotxEntry.insert(0, self.plotOptions[0])
+                
+            if self.plotyEntry.get() == 'CFM_V':
+                # Change value to first on list
+                self.plotyEntry.delete(0, tk.END)
+                self.plotyEntry.insert(0, self.plotOptions[0])
+                
+        self.plotxEntry.configure(values=self.plotOptions)
+        self.plotyEntry.configure(values=self.plotOptions)
+        
 
 if __name__ == "__main__":
     hystGUI = tk.Tk()
