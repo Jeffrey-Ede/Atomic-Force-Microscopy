@@ -31,6 +31,10 @@ import webbrowser # To open link to help web page
 
 import scipy.interpolate as interpolate # Expansion/compression of scoped data
 
+import os # To delete files
+
+import time # Data and time
+
 class HystGUI(tk.Frame):
 
     # Initialise main window
@@ -247,19 +251,35 @@ class HystGUI(tk.Frame):
         
         # Save full CFM data?
         self.saveCFM = tk.IntVar()
-        self.saveCFMLabel = tk.Label(self.hystGUI, text="Save All", bg=self.cfmClr)
+        self.saveCFMLabel = tk.Label(self.hystGUI, text="Save Data", bg=self.cfmClr)
         self.saveCFMEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.saveCFM, onvalue=1, 
                                                 offvalue=0, bg=self.cfmClr)
         
         # Location to save CFM to
-        self.saveCFMToLabel = tk.Label(self.hystGUI, text="Save To", bg=self.cfmClr)
+        self.saveCFMToLabel = tk.Label(self.hystGUI, text="Append To", bg=self.cfmClr)
         self.saveCFMToEntry = tk.Entry(self.hystGUI)
         
         # CFM save location
         self.saveCFMButton = tk.Button(self.hystGUI, text='Save To', command=self.cfm_save_loc,
                                          bg=self.btnClr)
         
+        # Clear CFM save location
+        self.clearCFMButton = tk.Button(self.hystGUI, text='Clear', command=self.clear_cfm_save_loc,
+                                         bg=self.btnClr)
         
+        # Save settings
+        self.saveSettingsButton = tk.Button(self.hystGUI, text='Save Settings', command=self.save_settings,
+                                         bg=self.btnClr)
+        
+        # Load settings
+        self.loadSettingsButton = tk.Button(self.hystGUI, text='Load Settings', command=self.load_settings,
+                                         bg=self.btnClr)
+        
+        # Choose whether to resynchronise settings during measurement
+        self.unsync = tk.IntVar()
+        self.unsyncLabel = tk.Label(self.hystGUI, text="Unsynchronised", bg=self.cfmClr)
+        self.unsyncEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.unsync,
+                                         onvalue=1, offvalue=0, bg=self.cfmClr)
         
         # Tooltips
         # Probe max DC Offset
@@ -295,7 +315,8 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.saveCFMEntry, "Save all CFM data after each poll.")
         tooltip.createToolTip(self.saveCFMToEntry, "Location to save CFM data to.")
         tooltip.createToolTip(self.saveCFMButton, "Opens save as dialogue.")
-        
+        tooltip.createToolTip(self.unsyncEntry, "Do not perform resynchronisations\nafter initial synchronisation.")
+        tooltip.createToolTip(self.clearCFMButton, "Clear CFM save location.")
 
         ###################################################
         # Grid positions of labels, entry boxes, etc.
@@ -365,22 +386,23 @@ class HystGUI(tk.Frame):
         self.makeDefaultButton.grid(row=3, column=7, sticky=tk.E+tk.W)
         
         # Plot
-        self.plotLabel.grid(row=17, column=0, sticky=tk.W)
+        p = 18
+        self.plotLabel.grid(row=p, column=0, sticky=tk.W)
         
         # Horizontal axis
-        self.plotxLabel.grid(row=18, column=0, sticky=tk.W)
-        self.plotxUnit.grid(row=18, column=2, sticky=tk.W)
-        self.plotxEntry.grid(row=18, column=1, sticky=tk.E+tk.W)
+        self.plotxLabel.grid(row=p+1, column=0, sticky=tk.W)
+        self.plotxUnit.grid(row=p+1, column=2, sticky=tk.W)
+        self.plotxEntry.grid(row=p+1, column=1, sticky=tk.E+tk.W)
         
         # Vertical axis
-        self.plotyLabel.grid(row=18, column=3, sticky=tk.W)
-        self.plotyUnit.grid(row=18, column=5, sticky=tk.W)
-        self.plotyEntry.grid(row=18, column=4, sticky=tk.E+tk.W)
+        self.plotyLabel.grid(row=p+1, column=3, sticky=tk.W)
+        self.plotyUnit.grid(row=p+1, column=5, sticky=tk.W)
+        self.plotyEntry.grid(row=p+1, column=4, sticky=tk.E+tk.W)
         
         # Plot buttons
-        self.plotButton.grid(row=17, column=7, sticky=tk.E+tk.W)
-        self.clearPlotButton.grid(row=18, column=7, sticky=tk.E+tk.W)
-        self.saveButton.grid(row=19, column=7, sticky=tk.E+tk.W)
+        self.plotButton.grid(row=p, column=7, sticky=tk.E+tk.W)
+        self.clearPlotButton.grid(row=p+1, column=7, sticky=tk.E+tk.W)
+        self.saveButton.grid(row=p+2, column=7, sticky=tk.E+tk.W)
         
         # Probe out
         self.probeOutLabel.grid(row=3, column=3, sticky=tk.W)
@@ -388,17 +410,23 @@ class HystGUI(tk.Frame):
         self.probeOutEntry.grid(row=3, column=4, sticky=tk.E+tk.W)
         
         # Average repeated x values
-        self.avgRepeatedxLabel.grid(row=19, column=0, sticky=tk.W)
-        self.avgRepeatedxEntry.grid(row=19, column=1, sticky=tk.W)
+        self.avgRepeatedxLabel.grid(row=p+2, column=0, sticky=tk.W)
+        self.avgRepeatedxEntry.grid(row=p+2, column=1, sticky=tk.W)
         
         # Average repeated y values
-        self.avgRepeatedyLabel.grid(row=19, column=3, sticky=tk.W)
-        self.avgRepeatedyEntry.grid(row=19, column=4, sticky=tk.W)
+        self.avgRepeatedyLabel.grid(row=p+2, column=3, sticky=tk.W)
+        self.avgRepeatedyEntry.grid(row=p+2, column=4, sticky=tk.W)
         
         # Demodulator
         self.demodLabel.grid(row=9, column=0, sticky=tk.W)
         self.demodUnit.grid(row=9, column=2, sticky=tk.W)
         self.demodEntry.grid(row=9, column=1, sticky=tk.E+tk.W)
+        
+        # Save settings
+        self.saveSettingsButton.grid(row=6, column=7, sticky=tk.E+tk.W)
+        
+        # Load settings
+        self.loadSettingsButton.grid(row=7, column=7, sticky=tk.E+tk.W)
         
         # Help
         self.helpButton.grid(row=4, column=7, sticky=tk.E+tk.W)
@@ -432,7 +460,14 @@ class HystGUI(tk.Frame):
         self.saveCFMToEntry.grid(row=14, column=4, sticky=tk.E+tk.W)
         
         # CFM save location
-        self.saveCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
+        self.saveCFMButton.grid(row=13, column=7, sticky=tk.E+tk.W)
+        
+        # Clear CFM save location
+        self.clearCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
+        
+        # Disable resynchronisation
+        self.unsyncLabel.grid(row=17, column=0, sticky=tk.W)
+        self.unsyncEntry.grid(row=17, column=1, sticky=tk.W)
         
         
         # Configure grid spacing
@@ -474,6 +509,7 @@ class HystGUI(tk.Frame):
         self.scopeTimeEntry.insert(0, self.default[22])
         self.saveCFM.set(self.default[23])
         self.saveCFMToEntry.insert(0, self.default[24])
+        self.unsync.set(self.default[25])
         
         
         # Only display available plot options: not CFM data if CFM mode is not enabled
@@ -622,17 +658,17 @@ class HystGUI(tk.Frame):
         if not scopeTime in self.scopeTimes:
             errText.insert(tk.END, "CFM sampling rate is not in "+str(self.scopeTimes)+"\n")
             
-        if self.doCFM.get() == 1:
-            time = ''
-            for i, val in enumerate(self.scopeTimes):
-                if val == self.scopeTimeEntry.get():
-                    time = self.scopeTimes_times[i]
-                    
-            if biasTimeEntry < 100+time and biasTimeEntry !=0:
-                errText.insert(tk.END, "Bias time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
-                
-            if zeroVTimeEntry< 100+time and zeroVTimeEntry != 0:
-                errText.insert(tk.END, "0 V time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
+#        if self.doCFM.get() == 1:
+#            time = ''
+#            for i, val in enumerate(self.scopeTimes):
+#                if val == self.scopeTimeEntry.get():
+#                    time = self.scopeTimes_times[i]
+#                    
+##            if biasTimeEntry < 100+time and biasTimeEntry !=0:
+##                errText.insert(tk.END, "Bias time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
+##                
+##            if zeroVTimeEntry< 100+time and zeroVTimeEntry != 0:
+##                errText.insert(tk.END, "0 V time must be at leat 100ms+sampling\ntime, preferably higher, to poll the scope\n")
             
         demod_index = self.demodEntry.get()
         if not demod_index in self.demods:
@@ -715,9 +751,11 @@ class HystGUI(tk.Frame):
         self.scopeTimeEntry.insert(0, self.default[22])
         self.saveCFM.set(self.default[23])
         self.saveCFMToEntry.insert(0, self.default[24])
+        self.unsync.set(self.default[25])
         
     # Make current values default
     def makeDefault(self):
+        
         self.default[0] = self.probeMaxDCEntry.get()
         self.default[1] = self.probeMinDCEntry.get()
         self.default[2] = self.botElectMaxDCEntry.get()
@@ -743,6 +781,7 @@ class HystGUI(tk.Frame):
         self.default[22] = self.scopeTimeEntry.get()
         self.default[23] = str(self.saveCFM.get())
         self.default[24] = self.saveCFMToEntry.get()
+        self.default[25] = str(self.unsync.get())
         
         defaults = open(self.defaultFile, 'w')
         for default in self.default:
@@ -811,22 +850,50 @@ class HystGUI(tk.Frame):
         # Wait for the demodulator filter to settle.
         time_constant = 1e-6
         time.sleep(10*time_constant)
+        
+        scale = 0 # Scaling factor for 16-bit integers returned by CFM scope
+        
+        # Subscribe to scope if performing CFM 
+        if self.doCFM.get() == 1 and biasTime+zeroVTime > 0:
+            
+            scope_time = 0
+            for time_idx, rate in enumerate(self.scopeTimes):
+                if self.scopeTimeEntry.get() == rate:
+                    scope_time = time_idx
+                
+            scope_channel = int(self.cfmInEntry.get())-1 # -1 to get channel index rather than name
+            bwLim = self.bwLim.get()
+            
+            scope_settings = [['/%s/scopes/0/channel'         % (device), scope_channel],
+                              ['/%s/scopes/0/trigchannel'     % (device), -1],
+                              #['/%s/scopes/0/triglevel'       % (device), 0.0],
+                              #['/%s/scopes/0/trigholdoff'     % (device), 0.1],
+                              # Enable bandwidth limiting: avoid antialiasing effects due to
+                              # sub-sampling when the scope sample rate is less than the input
+                              # channel's sample rate.
+                              ['/%s/scopes/0/bwlimit'         % (device), bwLim],
+                              # Set the sampling rate.
+                              ['/%s/scopes/0/time'            % (device), scope_time],
+                              # Enable the scope
+                              ['/%s/scopes/0/enable' % device, 1]]
+            
+            daq.set(scope_settings)
+            
+            sigout_range = daq.getDouble('/%s/sigins/%d/range' % (device, scope_channel))
+            scale = sigout_range/(2**15)  # The scope's wave are 16-bit integers
+            
+            # CWrite metadata to file
+            fileName = self.saveCFMToEntry.get()
+            save_cfm_to = open(fileName, "a")
+            save_cfm_to.write(self.metadata())
+            save_cfm_to.close()
     
         # Perform a global synchronisation between the device and the data server:
-        # Ensure that the settings have taken effect on the device before issuing
-        # the getSample() command. Note: the sync() must be issued after waiting for
-        # the demodulator filter to settle above.
+        # Ensure that 1. the settings have taken effect on the device before issuing
+        # the poll() command and 2. clear the API's data buffers.
         daq.sync()
     
-        # Obtain one demodulator sample via ziDAQServer's low-level getSample()
-        # method - for extended data acquisition it's preferable to use
-        # ziDAQServer's poll() method or the ziDAQRecorder class.
-        sample = daq.getSample('/%s/demods/%d/sample' % (device, demod_index))
-        # Calculate the demodulator's magnitude and phase and add them to the sample
-        # dict.
-        sample['R'] = np.abs(sample['x'] + 1j*sample['y'])
-        sample['phi'] = np.angle(sample['x'] + 1j*sample['y'])
-        
+        # Set polling parameters
         poll_timeout = 500  # [ms]
         poll_flags=0
         poll_return_flat_dict=True
@@ -868,7 +935,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
                     
     
@@ -890,7 +957,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
                 
                 # Calculate Max-Min bias to apply
@@ -910,7 +977,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
                     
                     
@@ -937,7 +1004,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
                     
                 temp += int(numSteps/4)+addStep-1
@@ -962,7 +1029,7 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
                     
                 temp += int(numSteps/2)+addStep
@@ -987,9 +1054,14 @@ class HystGUI(tk.Frame):
                     
                     # Record relevant measurements
                     sample = self.bias_zero_samp(daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
-                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops)
+                       biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags, poll_return_flat_dict, numLoops, scale)
                     self.record_meas(sample)
-                    
+                
+                
+        # Disable the scope.
+            if self.doCFM.get() == 1:
+                daq.setInt('/%s/scopes/0/enable' % device, 0)
+                
         # Update progress
         self.executeButton['text'] = "Execute"
         self.hystGUI.update()
@@ -997,9 +1069,8 @@ class HystGUI(tk.Frame):
                 
     def bias_zero_samp(self, daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
                        biasTime, zeroVTime, biasInter, zeroVInter, poll_timeout, poll_flags,
-                       poll_return_flat_dict, numLoops):
+                       poll_return_flat_dict, numLoops, scale):
         
-        daq.setInt('/%s/scopes/0/enable' % device, 0)
         # Apply Bias
         daq.set([['/%s/auxouts/%d/offset' % (device, probeAux), probeOffset],
                  ['/%s/auxouts/%d/offset' % (device, botElectAux), botElectOffset]])
@@ -1008,11 +1079,8 @@ class HystGUI(tk.Frame):
         if biasInter != 0.0:
             time.sleep(biasInter)
         
-        # Perform a global synchronisation between the device and the data server:
-        # Ensure that 1. the settings have taken effect on the device before issuing
-        # the poll() command and 2. clear the API's data buffers.
-        daq.sync()
-                    
+        if not self.unsync.get() == 1:
+            daq.sync()
                     
         # Record data while bias is being applied
         # Unsubscribe from all paths.
@@ -1021,40 +1089,14 @@ class HystGUI(tk.Frame):
         path = '/%s/demods/%d/sample' % (device, demod_index) # Demodulator path
         path2 = '/%s/scopes/0/wave' % (device) # CFM scope path
         save_cfm_to = ""
-        scale = 0 # Scaling factor for 16-bit integers returned by CFM scope
         
-        # Subscribe to scope if performing CFM 
+        # Open file to append data if performing CFM
         if self.doCFM.get() == 1 and biasTime+zeroVTime > 0:
             
             # Complete cfm dataset will be save to hard disk
             fileName = self.saveCFMToEntry.get()
             save_cfm_to = open(fileName, "a")
             
-            scope_time = 0
-            for time_idx, rate in enumerate(self.scopeTimes):
-                if self.scopeTimeEntry.get() == rate:
-                    scope_time = time_idx
-                
-            scope_channel = int(self.cfmInEntry.get())-1 # -1 to get channel index rather than name
-            bwLim = self.bwLim.get()
-            
-            scope_settings = [['/%s/scopes/0/channel'         % (device), scope_channel],
-                              ['/%s/scopes/0/trigchannel'     % (device), -1],
-                              #['/%s/scopes/0/triglevel'       % (device), 0.0],
-                              #['/%s/scopes/0/trigholdoff'     % (device), 0.1],
-                              # Enable bandwidth limiting: avoid antialiasing effects due to
-                              # sub-sampling when the scope sample rate is less than the input
-                              # channel's sample rate.
-                              ['/%s/scopes/0/bwlimit'         % (device), bwLim],
-                              # Set the sampling rate.
-                              ['/%s/scopes/0/time'            % (device), scope_time],
-                              # Enable the scope
-                              ['/%s/scopes/0/enable' % device, 1]]
-            
-            daq.set(scope_settings)
-            
-            sigout_range = daq.getDouble('/%s/sigins/%d/range' % (device, scope_channel))
-            scale = sigout_range/(2**15)  # The scope's wave are 16-bit integers
             
         if biasTime != 0:
             
@@ -1139,7 +1181,10 @@ class HystGUI(tk.Frame):
         # Allow 0 V intermissionary settling time
         if zeroVInter != 0.0:
             time.sleep(zeroVInter)
-        daq.sync()
+        
+        
+        if not self.unsync.get() == 1:
+            daq.sync()
         
         if zeroVTime != 0.0:
             
@@ -1193,10 +1238,7 @@ class HystGUI(tk.Frame):
                 sample2 = data[path]
                 if self.doCFM.get() == 1:
                     scope_sample2 = data[path2]
-    
-            # Disable the scope.
-            if self.doCFM.get() == 1:
-                daq.setInt('/%s/scopes/0/enable' % device, 0)
+                    
     
             # Check how many seconds of demodulator data were returned by poll.
             # First, get the sampling rate of the device's ADCs, the device clockbase...
@@ -1208,9 +1250,9 @@ class HystGUI(tk.Frame):
     
             # Voltages
             sample2['ProbeV'] = np.empty(len(sample2['t']))
-            sample2['ProbeV'].fill(probeOffset)
+            sample2['ProbeV'].fill(0)
             sample2['BotElectV'] = np.empty(len(sample2['t']))
-            sample2['BotElectV'].fill(botElectOffset)
+            sample2['BotElectV'].fill(0)
             sample2['TotalV'] = sample2['ProbeV']-sample2['BotElectV']
                         
             # Calculate the demodulator's magnitude and phase and add them to the dict.
@@ -1246,29 +1288,19 @@ class HystGUI(tk.Frame):
                                 # Extract and scale the voltages
                                 scaled_shots = scale*shot_set['wave']
                                 for scaled_shot in scaled_shots:
-                                    save_cfm_to.write(str(scaled_shot)+"\n")
+                                    save_cfm_to.write(str(scaled_shot)+"\n")                                        
                                     
                                 shot_sets = np.append(shot_sets, scaled_shots)
-                        
+                                
                 else:
+                    
                     for shot_set in scope_sample:
                         scaled_shots = scale*shot_set['wave']
                         shot_sets = np.append(shot_sets, scaled_shots)
             
-                
                 # Compress shot train array to same size as other arrays
-                box_size = int(np.ceil(len(shot_sets)/len(sample['t'])))
-                if len(shot_sets)%len(sample['t'])>0:
-                    sample['CFM_V'] = np.zeros(len(sample['t']))
-                    
-                    for i in range(len(sample['t'])-1):
-                        sample['CFM_V'][i] = np.mean(shot_sets[(i*box_size):((i+1)*box_size)])
-                    sample['CFM_V'][len(sample['t'])-1] = np.mean(shot_sets[(box_size*(len(sample['t'])-1)):])
-                    
-                else:
-                    sample['CFM_V'] = np.empty(len(sample['t']))
-                    for i in range(len(sample['t'])):
-                        sample['CFM_V'][i] = np.mean(shot_sets[(i*box_size):((i+1)*box_size)])
+                sample['CFM_V'] = self.mean_chunks(shot_sets, len(shot_sets), len(sample['t']))
+            
             
             if zeroVTime != 0.0:
             
@@ -1300,29 +1332,19 @@ class HystGUI(tk.Frame):
                                 shot_sets2 = np.append(shot_sets2, scaled_shots)
                         
                 else:
+                    
                     for shot_set in scope_sample2:
                         scaled_shots = scale*shot_set['wave']
                         shot_sets2 = np.append(shot_sets2, scaled_shots)
                 
-                    
+                
                 # Compress shot train array to same size as other arrays
-                box_size = int(np.ceil(len(shot_sets2)/len(sample2['t'])))
-                if len(shot_sets2)%len(sample2['t']) > 0:
-                    sample2['CFM_V'] = np.zeros(len(sample2['t']))
-                    
-                    for i in range(len(sample2['t'])-1):
-                        sample2['CFM_V'][i] = np.mean(shot_sets2[(i*box_size):((i+1)*box_size)])
-                    sample2['CFM_V'][len(sample2['t'])-1] = np.mean(shot_sets[(box_size*(len(sample2['t'])-1)):])
-                    
-                else:
-                    sample2['CFM_V'] = np.empty(len(sample2['t']))
-                    for i in range(len(sample2['t'])):
-                        sample2['CFM_V'][i] = np.mean(shot_sets2[(i*box_size):((i+1)*box_size)])
+                sample2['CFM_V'] = self.mean_chunks(shot_sets2, len(shot_sets2), len(sample2['t']))
                         
                 sample['CFM_V'] = np.append(sample['CFM_V'], sample2['CFM_V'])
                 
                 
-        save_cfm_to.close()
+            save_cfm_to.close()
                 
         if biasTime != 0 and zeroVTime != 0.0:
             
@@ -1469,21 +1491,37 @@ class HystGUI(tk.Frame):
         
     
     # Output data
-    def output_data(self):
+    def output_data(self):        
+        
+        text = ""
         
         if self.doCFM.get() == 0:
-            headings = [i for i, heading in enumerate(self.plotSelection) if heading != 'CFM_V']
-        else:
-            headings = self.plotSelection
             
-        text = ""
-        for index in headings:
-            text += " "+self.plotSelection[index]
-        text += "\n"
-        
-        for index in headings:
-            text += " "+self.units[index]
-        text += "\n"
+            index = -1
+            for i in range(len(self.plotSelection)):
+                if self.plotSelection[i] == 'CFM_V':
+                    index = i
+                    break
+            
+            for i in range(len(self.plotSelection)):
+                if not i == index:
+                    text += " "+self.plotSelection[i]
+            text += "\n"
+            
+            for i in range(len(self.units)):
+                if not i == index:
+                    text += " "+self.units[i]
+            text += "\n"
+            
+        else:
+            
+            for heading in self.plotSelection:
+                    text += " "+heading
+            text += "\n"
+            
+            for unit in self.units:
+                    text += " "+unit
+            text += "\n"
 
         # Average over repeating values and print to file
         x_get = self.avgRepeatedx.get()
@@ -1509,7 +1547,7 @@ class HystGUI(tk.Frame):
                     if i == len(self.measurements[x_axis])-1:
                         # Add averages to output
                         for k, key in enumerate(self.measurements):
-                            if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                            if key == 'CFM_V' and self.doCFM.get() == 0:
                                 continue
                             if key == x_axis:
                                 text += str(prevx) + "    "
@@ -1523,7 +1561,7 @@ class HystGUI(tk.Frame):
                 # If x is not the same as previous
                 else:
                     for k, key in enumerate(self.measurements):
-                        if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                        if key == 'CFM_V' and self.doCFM.get() == 0:
                             continue
                         if key == x_axis:
                             text += str(prevx) + "    "
@@ -1541,7 +1579,7 @@ class HystGUI(tk.Frame):
                     # Check if this is the last element of the array
                     if i == len(self.measurements[x_axis])-1:
                         for key in self.measurements:
-                            if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                            if key == 'CFM_V' and self.doCFM.get() == 0:
                                 continue
                             text += str(self.measurements[key][i]) + "    "
                         text += "\n"
@@ -1550,14 +1588,19 @@ class HystGUI(tk.Frame):
             # Print data to file without averaging repeats
             for i in range(len(self.measurements['X'])):
                 for key in self.measurements:
-                    if key == 'ÇFM_V' and self.doCFM.get() == 0:
+                    if key == 'CFM_V' and self.doCFM.get() == 0:
                         continue
                     text += str(self.measurements[key][i])+"    "
                 text += "\n"
             
+        # Get save location
         f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".txt")
         if f is None: # asksaveasfile returns `None` if dialog closed with 'cancel'.
             return
+    
+        # Get metadata
+        f.write(self.metadata())
+        
         f.write(text)
         f.close()
         
@@ -1595,6 +1638,176 @@ class HystGUI(tk.Frame):
                 
         self.plotxEntry.configure(values=self.plotOptions)
         self.plotyEntry.configure(values=self.plotOptions)
+        
+        
+    # Save current settings to file
+    def save_settings(self):
+        
+        f = tk.filedialog.asksaveasfile(mode='w', defaultextension=".txt")
+        
+        # Write entry field values to file 
+        f.write(self.probeMaxDCEntry.get())
+        f.write(self.probeMinDCEntry.get())
+        f.write(self.botElectMaxDCEntry.get())
+        f.write(self.botElectMinDCEntry.get())
+        f.write(self.biasTimeEntry.get())
+        f.write(self.biasInterEntry.get())
+        f.write(self.zeroVTimeEntry.get())
+        f.write(self.zeroVInterEntry.get())
+        f.write(self.numStepsEntry.get())
+        f.write(self.numLoopsEntry.get())
+        f.write(self.probeAuxEntry.get())
+        f.write(self.botElectAuxEntry.get())
+        f.write(self.patternEntry.get())
+        f.write(self.plotxEntry.get())
+        f.write(self.plotyEntry.get())
+        f.write(self.probeOutEntry.get())
+        f.write(str(self.avgRepeatedx.get()))
+        f.write(str(self.avgRepeatedy.get()))
+        f.write(self.demodEntry.get())
+        f.write(str(self.doCFM.get()))
+        f.write(str(self.bwLim.get()))
+        f.write(self.cfmInEntry.get())
+        f.write(self.scopeTimeEntry.get())
+        f.write(str(self.saveCFM.get()))
+        f.write(self.saveCFMToEntry.get())
+        f.write(str(self.unsync.get()))
+        
+        f.close()
+        
+        
+    # Load current settings to file
+    def load_settings(self):
+        
+        # Get new settings
+        fileName = tk.filedialog.askopenfilename()
+        
+        f = open(fileName, "r")
+        new_setting = f.read().splitlines()
+        f.close()
+        
+        # Clear the entry fields
+        self.probeMaxDCEntry.delete(0, tk.END)
+        self.probeMinDCEntry.delete(0, tk.END)
+        self.botElectMaxDCEntry.delete(0, tk.END)
+        self.botElectMinDCEntry.delete(0, tk.END)
+        self.biasTimeEntry.delete(0, tk.END)
+        self.biasInterEntry.delete(0, tk.END)
+        self.zeroVTimeEntry.delete(0, tk.END)
+        self.zeroVInterEntry.delete(0, tk.END)
+        self.numStepsEntry.delete(0, tk.END)
+        self.numLoopsEntry.delete(0, tk.END)
+        self.patternEntry.delete(0, tk.END)
+        self.probeAuxEntry.delete(0, tk.END)
+        self.botElectAuxEntry.delete(0, tk.END)
+        self.patternEntry.delete(0, tk.END)
+        self.plotxEntry.delete(0, tk.END)
+        self.plotyEntry.delete(0, tk.END)
+        self.probeOutEntry.delete(0, tk.END)
+        self.demodEntry.delete(0, tk.END)
+        self.cfmInEntry.delete(0, tk.END)
+        self.scopeTimeEntry.delete(0, tk.END)
+        self.saveCFMToEntry.delete(0, tk.END)
+        
+        # Insert new values into now-cleared entry fields
+        self.probeMaxDCEntry.insert(0, new_setting[0])
+        self.probeMinDCEntry.insert(0, new_setting[1])
+        self.botElectMaxDCEntry.insert(0, new_setting[2])
+        self.botElectMinDCEntry.insert(0, new_setting[3])
+        self.biasTimeEntry.insert(0, new_setting[4])
+        self.biasInterEntry.insert(0, new_setting[5])
+        self.zeroVTimeEntry.insert(0, new_setting[6])
+        self.zeroVInterEntry.insert(0, new_setting[7])
+        self.numStepsEntry.insert(0, new_setting[8])
+        self.numLoopsEntry.insert(0, new_setting[9])
+        self.probeAuxEntry.insert(0, new_setting[10])
+        self.botElectAuxEntry.insert(0, new_setting[11])
+        self.patternEntry.insert(0, new_setting[12])
+        self.plotxEntry.insert(0, new_setting[13])
+        self.plotyEntry.insert(0, new_setting[14])
+        self.probeOutEntry.insert(0, new_setting[15])
+        self.avgRepeatedx.set(new_setting[16])
+        self.avgRepeatedy.set(new_setting[17])
+        self.demodEntry.insert(0, new_setting[18])
+        self.doCFM.set(new_setting[19])
+        self.bwLim.set(new_setting[20])
+        self.cfmInEntry.insert(0, new_setting[21])
+        self.scopeTimeEntry.insert(0, new_setting[22])
+        self.saveCFM.set(new_setting[23])
+        self.saveCFMToEntry.insert(0, new_setting[24])
+        self.unsync.set(new_setting[25])
+        
+        
+    # Change arr1 of sizelen1 to smaller size len2 by taking means of chinks
+    def mean_chunks(self, arr1, len1, len2):
+        
+        result = np.zeros(len2)
+        
+        # Larger array length is perfect multiple of smaller array size
+        box_size = int(len1/len2)
+        if len1%len2 == 0:
+            for i in range(len2):
+                result[i] = np.mean(arr1[(i*box_size):((i+1)*box_size)])
+         
+        # Larger array length is not a perfect multiple of smaller array size
+        else:
+            
+            over = int(len1%len2)
+            tot_over = 0
+            start, end = 0, box_size
+            for i in range(len2):
+                tot_over += over
+                
+                if tot_over >= len2:
+                    end += 1
+                    tot_over -= len2
+                    
+                result[i] = np.mean(arr1[start:end])
+                
+                start = end
+                end = end+box_size
+            
+        return result
+    
+    
+    # Clear CFM save location
+    def clear_cfm_save_loc(self):
+        
+        fileName = self.saveCFMToEntry.get()
+        f = open(fileName, "w")
+        f.close()
+        
+    # Prepare metadata
+    def metadata(self):
+        
+        metadata = "Current date & time: " + time.strftime("%c")+"\n\n"
+        
+        # Entry field values
+        metadata += "Probe Max DC: "+self.probeMaxDCEntry.get()+" V\n"
+        metadata += "Probe Min DC: "+self.probeMinDCEntry.get()+" V\n"
+        metadata += "Bottom Electrode Max DC: "+self.botElectMaxDCEntry.get()+" V\n"
+        metadata += "Bottom Electrode Min DC: "+self.botElectMinDCEntry.get()+" V\n"
+        metadata += "Bias Time: "+self.biasTimeEntry.get()+" ms\n"
+        metadata += "Bias Wait: "+self.biasInterEntry.get()+" ms\n"
+        metadata += "0 V Time: "+self.zeroVTimeEntry.get()+" ms\n"
+        metadata += "0 V Wait: "+self.zeroVInterEntry.get()+" ms\n"
+        metadata += "Number of Steps: "+self.numStepsEntry.get()+"\n"
+        metadata += "Number of Loops: "+self.numLoopsEntry.get()+"\n"
+        metadata += "Probe Auxiliary Output: "+self.probeAuxEntry.get()+"\n"
+        metadata += "Bottom Electrode Auxiliary Output: "+self.botElectAuxEntry.get()+"\n"
+        metadata += "Pattern: "+self.patternEntry.get()+"\n"
+        metadata += "Probe Output: "+self.probeOutEntry.get()+"\n"
+        metadata += "Average Repeated x: "+str(self.avgRepeatedx.get())+"\n"
+        metadata += "Average Repeated y: "+str(self.avgRepeatedy.get())+"\n"
+        metadata += "Demodulator: "+self.demodEntry.get()+"\n"
+        metadata += "Do CFM: "+str(self.doCFM.get())+"\n"
+        metadata += "Bandwidth Limit: "+str(self.bwLim.get())+"\n"
+        metadata += "CFM Input: "+self.cfmInEntry.get()+"\n"
+        metadata += "Scope Sampling Rate: "+self.scopeTimeEntry.get()+"\n"
+        metadata += "Save CFM: "+str(self.saveCFM.get())+"\n"
+        metadata += "Unsynchronised: "+str(self.unsync.get())+"\n\n"
+        
+        return metadata
         
 
 if __name__ == "__main__":
