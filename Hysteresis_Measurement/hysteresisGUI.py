@@ -59,7 +59,10 @@ class HystGUI(tk.Frame):
         self.scopeTimes_times = (10.0e-3, 20.0e-3, 39.0e-3, 78.0e-3, 160.0e-3,
                                  310.0e-3, 620.0e-3, 1.2, 2.5, 5.0,
                                  10.0, 20.0, 40.0, 80.0, 160.0, 320.0) # self.scopeTimes times in ms
-        
+        self.fourierSelection = ('None', 'Low Pass', 'High Pass')
+        self.fourierOptions = ('Shot Set', 'Voltage Set', 'All Data')
+        self.shot_len = 2048
+                                 
         # Read default entry values from file
         self.defaultFile = 'hysteresis_default_values.txt'
         hystDefaultVal = open(self.defaultFile, 'r')
@@ -281,6 +284,43 @@ class HystGUI(tk.Frame):
         self.unsyncEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.unsync,
                                          onvalue=1, offvalue=0, bg=self.cfmClr)
         
+        # Fourier filter
+        self.fourierSectLabel = tk.Label(self.hystGUI, text="Fourier Filter", font=("bold", 10), bg=self.cfmClr)
+        
+        # Fourier save location
+        self.saveFourierButton = tk.Button(self.hystGUI, text='Save Fourier To', command=self.fourier_save_loc,
+                                         bg=self.btnClr)
+        
+        # Clear Fourier save location
+        self.clearFourierButton = tk.Button(self.hystGUI, text='Clear Fourier', command=self.clear_fourier_save_loc,
+                                         bg=self.btnClr)
+        
+        # Fourier filter type
+        self.filterTypeLabel = tk.Label(self.hystGUI, text="Fourier Filter", bg=self.cfmClr)
+        self.filterTypeEntry = tk.ttk.Combobox(self.hystGUI, values=self.fourierSelection)
+        
+        
+        # Automatic filtering
+        self.fourier = tk.IntVar()
+        self.fourierLabel = tk.Label(self.hystGUI, text="Auto Fourier", bg=self.cfmClr)
+        self.fourierEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.fourier,
+                                         onvalue=1, offvalue=0, bg=self.cfmClr)
+        
+        # Filter by shot set, voltage set\ or all data
+        self.filterByLabel = tk.Label(self.hystGUI, text="Filter By", bg=self.cfmClr)
+        self.filterByEntry = tk.ttk.Combobox(self.hystGUI, values=self.fourierOptions)
+        
+        # Fourier data
+        self.fourierLocLabel = tk.Label(self.hystGUI, text="Save Fourier To", bg=self.cfmClr)
+        self.fourierLocEntry = tk.Entry(self.hystGUI)
+        
+        # Fourier cutoff
+        self.cutoffLabel = tk.Label(self.hystGUI, text="Cutoff", bg=self.cfmClr)
+        self.cutoffUnit = tk.Label(self.hystGUI, text="Hz", bg=self.cfmClr)
+        self.cutoffEntry = tk.Entry(self.hystGUI, validate="key")
+        self.cutoffEntry['validatecommand'] = (self.cutoffEntry.register(self.testValPos),'%P','%i','%d')
+        
+        
         # Tooltips
         # Probe max DC Offset
         tooltip.createToolTip(self.probeMaxDCEntry, "Probe max bias offset.\nLimits: ±10V")
@@ -316,7 +356,13 @@ class HystGUI(tk.Frame):
         tooltip.createToolTip(self.saveCFMToEntry, "Location to save CFM data to.")
         tooltip.createToolTip(self.saveCFMButton, "Opens save as dialogue.")
         tooltip.createToolTip(self.unsyncEntry, "Do not perform resynchronisations\nafter initial synchronisation.")
-        tooltip.createToolTip(self.clearCFMButton, "Clear CFM save location.")
+        tooltip.createToolTip(self.clearCFMButton, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.saveFourierButton, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.clearFourierButton, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.filterTypeEntry, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.fourierEntry, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.fourierLocEntry, "Clear CFM save location(s).")
+        tooltip.createToolTip(self.filterByEntry, "Clear CFM save location(s).")
 
         ###################################################
         # Grid positions of labels, entry boxes, etc.
@@ -386,7 +432,7 @@ class HystGUI(tk.Frame):
         self.makeDefaultButton.grid(row=3, column=7, sticky=tk.E+tk.W)
         
         # Plot
-        p = 18
+        p = 21
         self.plotLabel.grid(row=p, column=0, sticky=tk.W)
         
         # Horizontal axis
@@ -439,8 +485,8 @@ class HystGUI(tk.Frame):
         self.doCFMEntry.grid(row=13, column=1, sticky=tk.W)
         
         # Bandwidth limit
-        self.bwLimLabel.grid(row=15, column=3, sticky=tk.W)
-        self.bwLimEntry.grid(row=15, column=4, sticky=tk.W)
+        self.bwLimLabel.grid(row=16, column=3, sticky=tk.W)
+        self.bwLimEntry.grid(row=16, column=4, sticky=tk.W)
         
         # Voltage input channel
         self.cfmInLabel.grid(row=14, column=0, sticky=tk.W)
@@ -465,10 +511,39 @@ class HystGUI(tk.Frame):
         # Clear CFM save location
         self.clearCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
         
-        # Disable resynchronisation
-        self.unsyncLabel.grid(row=17, column=0, sticky=tk.W)
-        self.unsyncEntry.grid(row=17, column=1, sticky=tk.W)
+        # Fourier filter
+        self.fourierSectLabel.grid(row=17, column=0, sticky=tk.W)
         
+        # Fourier save location
+        self.saveFourierButton.grid(row=18, column=7, sticky=tk.E+tk.W)
+
+        # Clear Fourier save location
+        self.clearFourierButton.grid(row=19, column=7, sticky=tk.E+tk.W)
+        
+        # Fourier filter type
+        self.filterTypeLabel.grid(row=15, column=3, sticky=tk.W)
+        self.filterTypeEntry.grid(row=15, column=4, sticky=tk.E+tk.W)
+        
+        # Automatic filtering
+        self.fourierLabel.grid(row=18, column=3, sticky=tk.W)
+        self.fourierEntry.grid(row=18, column=4, sticky=tk.W)
+        
+        # Filter by shot set, voltage set\ or all data
+        self.filterByLabel.grid(row=18, column=0, sticky=tk.W)
+        self.filterByEntry.grid(row=18, column=1, sticky=tk.E+tk.W)
+        
+        # Fourier data
+        self.fourierLocLabel.grid(row=19, column=3, sticky=tk.W)
+        self.fourierLocEntry.grid(row=19, column=4, sticky=tk.E+tk.W)
+        
+        # Fourier cutoff
+        self.cutoffLabel.grid(row=19, column=0, sticky=tk.W)
+        self.cutoffUnit.grid(row=19, column=2, sticky=tk.W)
+        self.cutoffEntry.grid(row=19, column=1, sticky=tk.E+tk.W)
+        
+        # Disable resynchronisation
+        self.unsyncLabel.grid(row=16, column=0, sticky=tk.W)
+        self.unsyncEntry.grid(row=16, column=1, sticky=tk.W)
         
         # Configure grid spacing
         for row_num in range(self.hystGUI.grid_size()[1]):
@@ -510,7 +585,11 @@ class HystGUI(tk.Frame):
         self.saveCFM.set(self.default[23])
         self.saveCFMToEntry.insert(0, self.default[24])
         self.unsync.set(self.default[25])
-        
+        self.filterTypeEntry.insert(0, self.default[26])
+        self.fourier.set(self.default[27])
+        self.filterByEntry.insert(0, self.default[28])
+        self.fourierLocEntry.insert(0, self.default[29])
+        self.cutoffEntry.insert(0, self.default[30])
         
         # Only display available plot options: not CFM data if CFM mode is not enabled
         if self.default[19] == 1:
@@ -724,6 +803,10 @@ class HystGUI(tk.Frame):
         self.cfmInEntry.delete(0, tk.END)
         self.scopeTimeEntry.delete(0, tk.END)
         self.saveCFMToEntry.delete(0, tk.END)
+        self.filterTypeEntry.delete(0, tk.END)
+        self.filterByEntry.insert(0, tk.END)
+        self.fourierLocEntry.insert(0, tk.END)
+        self.cutoffEntry.insert(0, tk.END)
         
         # Insert defaults into now-cleared entry fields
         self.probeMaxDCEntry.insert(0, self.default[0])
@@ -752,6 +835,11 @@ class HystGUI(tk.Frame):
         self.saveCFM.set(self.default[23])
         self.saveCFMToEntry.insert(0, self.default[24])
         self.unsync.set(self.default[25])
+        self.filterTypeEntry.insert(0, self.default[26])
+        self.fourier.set(self.default[27])
+        self.filterByEntry.insert(0, self.default[28])
+        self.fourierLocEntry.insert(0, self.default[29])
+        self.cutoffEntry.insert(0, self.default[30])
         
     # Make current values default
     def makeDefault(self):
@@ -782,6 +870,11 @@ class HystGUI(tk.Frame):
         self.default[23] = str(self.saveCFM.get())
         self.default[24] = self.saveCFMToEntry.get()
         self.default[25] = str(self.unsync.get())
+        self.default[26] = self.filterTypeEntry.get()
+        self.default[27] = str(self.fourier.get())
+        self.default[28] = self.filterByEntry.get()
+        self.default[29] = self.fourierLocEntry.get()
+        self.default[30] = self.cutoffEntry.get()
         
         defaults = open(self.defaultFile, 'w')
         for default in self.default:
@@ -1059,12 +1152,16 @@ class HystGUI(tk.Frame):
                 
                 
         # Disable the scope.
-            if self.doCFM.get() == 1:
-                daq.setInt('/%s/scopes/0/enable' % device, 0)
+        if self.doCFM.get() == 1:
+            daq.setInt('/%s/scopes/0/enable' % device, 0)
                 
         # Update progress
         self.executeButton['text'] = "Execute"
         self.hystGUI.update()
+        
+        # Fourier filter CFM data
+        if self.doCFM.get() == 1:
+            self.fourier_filter()
                     
                 
     def bias_zero_samp(self, daq, device, probeAux, botElectAux, probeOffset, botElectOffset, demod_index,
@@ -1607,11 +1704,19 @@ class HystGUI(tk.Frame):
         
     # Location to save CFM data to
     def cfm_save_loc(self):
+        
         f = tk.filedialog.asksaveasfilename()
         f.replace("\\", "/")
-        self.default[24] = f
         self.saveCFMToEntry.delete(0, tk.END)
         self.saveCFMToEntry.insert(0, f)
+        
+        
+    # Clear CFM save location
+    def clear_cfm_save_loc(self):
+        
+        fileName = self.saveCFMToEntry.get()
+        f = open(fileName, "w")
+        f.close()
         
         
     # Interactive simulation to help user understand voltage train times
@@ -1672,6 +1777,11 @@ class HystGUI(tk.Frame):
         f.write(str(self.saveCFM.get()))
         f.write(self.saveCFMToEntry.get())
         f.write(str(self.unsync.get()))
+        f.write(self.filterTypeEntry.get())
+        f.write(str(self.fourier.get()))
+        f.write(self.filterByEntry.get())
+        f.write(self.fourierLocEntry.get())
+        f.write(self.cutoffEntry.get())
         
         f.close()
         
@@ -1708,6 +1818,10 @@ class HystGUI(tk.Frame):
         self.cfmInEntry.delete(0, tk.END)
         self.scopeTimeEntry.delete(0, tk.END)
         self.saveCFMToEntry.delete(0, tk.END)
+        self.filterTypeEntry.delete(0, tk.END)
+        self.filterByEntry.insert(0, tk.END)
+        self.fourierLocEntry.insert(0, tk.END)
+        self.cutoffEntry.insert(0, tk.END)
         
         # Insert new values into now-cleared entry fields
         self.probeMaxDCEntry.insert(0, new_setting[0])
@@ -1736,6 +1850,11 @@ class HystGUI(tk.Frame):
         self.saveCFM.set(new_setting[23])
         self.saveCFMToEntry.insert(0, new_setting[24])
         self.unsync.set(new_setting[25])
+        self.filterTypeEntry.insert(0, new_setting[26])
+        self.fourier.set(new_setting[27])
+        self.filterByEntry.insert(0, new_setting[28])
+        self.fourierLocEntry.insert(0, new_setting[29])
+        self.cutoffEntry.insert(0, new_setting[30])
         
         
     # Change arr1 of sizelen1 to smaller size len2 by taking means of chinks
@@ -1769,13 +1888,6 @@ class HystGUI(tk.Frame):
             
         return result
     
-    
-    # Clear CFM save location
-    def clear_cfm_save_loc(self):
-        
-        fileName = self.saveCFMToEntry.get()
-        f = open(fileName, "w")
-        f.close()
         
     # Prepare metadata
     def metadata(self):
@@ -1805,9 +1917,193 @@ class HystGUI(tk.Frame):
         metadata += "CFM Input: "+self.cfmInEntry.get()+"\n"
         metadata += "Scope Sampling Rate: "+self.scopeTimeEntry.get()+"\n"
         metadata += "Save CFM: "+str(self.saveCFM.get())+"\n"
-        metadata += "Unsynchronised: "+str(self.unsync.get())+"\n\n"
+        metadata += "CFM Location: "+self.saveCFMToEntry.get()+"\n"
+        metadata += "Unsynchronised: "+str(self.unsync.get())+"\n"
+        metadata += "Filter Type: "+self.filterTypeEntry.get()+"\n"
+        metadata += "Auto Fourier: "+str(self.fourier.get())+"\n"
+        metadata += "Filter By: "+self.filterByEntry.get()+"\n"
+        metadata += "Fourier Location: "+self.fourierLocEntry.get()+"\n"
+        metadata += "Cutoff: "+self.cutoffEntry.get()+"Hz\n\n"
         
         return metadata
+        
+      
+    # Location to save Fourier data to
+    def fourier_save_loc(self):
+        
+        f = tk.filedialog.asksaveasfilename()
+        f.replace("\\", "/")
+        self.fourierLocEntry.delete(0, tk.END)
+        self.fourierLocEntry.insert(0, f)
+        
+       
+    # Clear data from Fourier data save location
+    def clear_fourier_save_loc(self):
+        
+        fileName = self.fourierLocEntry.get()
+        f = open(fileName, "w")
+        f.close()
+        
+        
+    # Fourier transform 
+    def fourier_filter(self):
+        
+        # Open CFM data file for reading
+        if self.filterTypeEntry.get() != "None":
+                
+            # Open Fourier data file for appending
+            if self.fourierLocEntry.get() != "":
+                with open(self.fourierLocEntry.get(), "a") as f:
+                    
+                    f.write(self.metadata())
+                    f.write("time\tSignal\tfrequency\tfft\tabs(filtered fft)\tphase(filtered fft)\n")
+                    f.write("s\t-\tHz\t-\t-\tdeg\n")
+                    
+                    # Check if user also wants automatic Fourier filtering
+                    if self.fourier.get() == 1:
+                        
+                        # Filter each shot set
+                        if self.filterByEntry.get() == 'Shot Set':
+                            # Low pass filter
+                            if self.filterTypeEntry.get() == "Low Pass":
+                                
+                                temp2 = "temp2.txt"
+                                temp = "temp.txt"
+                                with open(self.saveCFMToEntry.get(), "r") as data:
+                                
+                                    # Copy original data, replacing values with filtered values,
+                                    # then replace original data file with it
+                                    with open(temp2, "w") as auto_filt:
+                                        # Create temp file to put calculations in
+                                        with open(temp, "w") as calcs:
+                                
+                                            cutoff = float(self.cutoffEntry.get())
+                                            
+                                            append = False
+                                            get_time = False
+                                            shot = np.zeros(self.shot_len)                                            
+                                            i = 0
+                                            for line in data:
+                                                    
+                                                if line == 'bwlimit\n':                                        
+                                                    append = False
+                                                    
+                                                elif append:
+                                                    shot[i] = float(line)
+                                                    i += 1
+                                                    
+                                                elif line == 'wave\n':
+                                                    append = True
+                                                    i = 0
+                                                    
+                                                elif get_time == True:
+                                                    # Fourier transform shot
+                                                    dt = float(line)
+                                                    
+                                                    fft = np.fft.fft(shot)
+                                                    freq = np.fft.fftfreq(self.shot_len, dt)
+                                                    
+                                                    # Apply filter in frequency domain
+                                                    for i in range(self.shot_len):
+                                                        if freq[i] > cutoff:
+                                                            fft[i] = 0+0j
+                                                    
+                                                    # Transform filtered signal back to time domain
+                                                    filt_sig = np.fft.ifft(fft)
+                                                    
+                                                    abs_fft = np.absolute(filt_sig)
+                                                    phase_fft = np.angle(filt_sig, deg=True)
+                                                    
+                                                    # Append results to fourier file
+                                                    for i in range(self.shot_len):
+                                                        
+                                                        f.write(str(i*dt)+"\t")
+                                                        f.write(str(shot[i])+"\t")
+                                                        f.write(str(freq[i])+"\t")
+                                                        f.write(str(fft[i])+"\t")
+                                                        f.write(str(abs_fft[i])+"\t")
+                                                        f.write(str(phase_fft[i])+"\n")
+                                                        
+                                                        # Add absolute filtered values to temp file as well
+                                                        calcs.write(str(abs_fft[i])+"\n")
+                                                        
+                                                    # Add blank line between each filtering instance
+                                                    f.write(str(phase_fft[i])+"\n")
+                                                    
+                                                    get_time = False
+                                                    
+                                                elif line == 'dt\n':
+                                                    get_time = True
+                                                    
+                                                    
+                                        # Read calculations from file
+                                        with open(temp, "r") as calcs:
+                                            
+                                            # Copy metadata and replace non-metadata with filtered data
+                                            nonmeta = False
+                                            i = 0
+                                            for line in calcs:
+                                                
+                                                if nonmeta:
+                                                    
+                                                    if i < self.shot_len:
+                                                        auto_filt.write(calcs.readline())
+                                                        i += 1
+                                                        
+                                                    else:
+                                                        i = 0
+                                                        nonmeta = False
+                                                        auto_filt.write(line)
+                                                        
+                                                # Following lines will be non-meta
+                                                elif line == 'wave':
+                                                    auto_filt.write(line)
+                                                    nonmeta = True
+                                                   
+                                                # Meta
+                                                else:
+                                                    auto_filt.write(line)
+                                                    
+                                        os.remove(temp)
+                                
+                                with open(self.saveCFMToEntry.get(), "w") as data:
+                                    with open(temp2, "r") as auto_filt:
+                                        for line in auto_filt:
+                                            data.write(line)
+                                    
+                                os.remove(temp2)
+                            
+                        elif self.filterByEntry.get() == 'Voltage Set':
+                            pass
+                        
+                        elif self.filterByEntry.get() == 'All Data':
+                            pass
+                            
+                            
+                    else:
+                        
+                        if self.filterByEntry.get() == 'Shot Set':
+                            pass
+                            
+                        elif self.filterByEntry.get() == 'Voltage Set':
+                            pass
+                        
+                        elif self.filterByEntry.get() == 'All Data':
+                            pass
+                        
+                   
+            # Check if user wants automatic Fourier filtering with no seperate output
+            elif self.fourier.get() == 1:
+                with open("temp.txt", "w") as f:
+                    
+                    if self.filterByEntry.get() == 'Shot Set':
+                        pass
+                            
+                    elif self.filterByEntry.get() == 'Voltage Set':
+                        pass
+                        
+                    elif self.filterByEntry.get() == 'All Data':
+                        pass
         
 
 if __name__ == "__main__":
