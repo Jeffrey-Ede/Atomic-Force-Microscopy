@@ -1,19 +1,31 @@
-10
--10
+1.2
+1.2
 0
 0
+300
 20
+300
 20
-20
-20
-50
+4
 1
 3
-2
-0-Max-0-Min-0
+4
+Min-Max
 t
-Phase
+TotalV
 1
 0
-0
+1
 3
+1
+1
+2
+210 MS, 10 micro s
+1
+D:/cfm_data.txt
+0
+Low Pass
+1
+Bias Set
+D:/fourier_data.txt
+1000
