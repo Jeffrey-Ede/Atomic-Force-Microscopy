@@ -7,16 +7,13 @@ Created on Thu Jul  6 10:57:40 2017
 
 # For communication with lock-in amplifier
 from __future__ import print_function
-import time
 import numpy as np
 import zhinst.utils
 
 # For graphical user interface
 import tkinter as tk
-from tkinter import ttk
 
 # For plotting
-import matplotlib
 #matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 
@@ -28,8 +25,6 @@ from matplotlib.figure import Figure
 import tooltip
 
 import webbrowser # To open link to help web page
-
-import scipy.interpolate as interpolate # Expansion/compression of scoped data
 
 import os # To delete files
 
@@ -78,6 +73,7 @@ class HystGUI(tk.Frame):
                              't': np.empty((0)), 'ProbeV': np.empty((0)), 'BotElectV': np.empty((0)), 'CFM_V': np.empty((0))} 
 
         self.helpPageURL = 'https://jeffrey-ede.shinyapps.io/voltage_trains/'
+
 
         """
         1. Initialise all data entry terminals, labels, etc.
@@ -285,7 +281,7 @@ class HystGUI(tk.Frame):
                                          onvalue=1, offvalue=0, bg=self.cfmClr)
         
         # Fourier filter
-        self.fourierSectLabel = tk.Label(self.hystGUI, text="Fourier Filter", font=("bold", 10), bg=self.cfmClr)
+        self.fourierSectLabel = tk.Label(self.hystGUI, text="Filter", font=("bold", 10), bg=self.cfmClr)
         
         # Fourier save location
         self.saveFourierButton = tk.Button(self.hystGUI, text='Save Fourier To', command=self.fourier_save_loc,
@@ -296,13 +292,13 @@ class HystGUI(tk.Frame):
                                          bg=self.btnClr)
         
         # Fourier filter type
-        self.filterTypeLabel = tk.Label(self.hystGUI, text="Fourier Filter", bg=self.cfmClr)
+        self.filterTypeLabel = tk.Label(self.hystGUI, text="Filter Type", bg=self.cfmClr)
         self.filterTypeEntry = tk.ttk.Combobox(self.hystGUI, values=self.fourierSelection)
         
         
         # Automatic filtering
         self.fourier = tk.IntVar()
-        self.fourierLabel = tk.Label(self.hystGUI, text="Auto Fourier", bg=self.cfmClr)
+        self.fourierLabel = tk.Label(self.hystGUI, text="Auto Filter", bg=self.cfmClr)
         self.fourierEntry = tk.Checkbutton(self.hystGUI, text="", variable=self.fourier,
                                          onvalue=1, offvalue=0, bg=self.cfmClr)
         
@@ -315,11 +311,14 @@ class HystGUI(tk.Frame):
         self.fourierLocEntry = tk.Entry(self.hystGUI)
         
         # Fourier cutoff
-        self.cutoffLabel = tk.Label(self.hystGUI, text="Cutoff", bg=self.cfmClr)
+        self.cutoffLabel = tk.Label(self.hystGUI, text="Filter Param", bg=self.cfmClr)
         self.cutoffUnit = tk.Label(self.hystGUI, text="Hz", bg=self.cfmClr)
         self.cutoffEntry = tk.Entry(self.hystGUI, validate="key")
         self.cutoffEntry['validatecommand'] = (self.cutoffEntry.register(self.testValPos),'%P','%i','%d')
         
+        # Open text files
+        self.openCFMButton = tk.Button(self.hystGUI, text='Open CFM', command=self.openCFM, bg=self.btnClr)
+        self.openFourierButton = tk.Button(self.hystGUI, text='Open Fourier', command=self.openFourier, bg=self.btnClr)
         
         # Tooltips
         # Probe max DC Offset
@@ -506,10 +505,10 @@ class HystGUI(tk.Frame):
         self.saveCFMToEntry.grid(row=14, column=4, sticky=tk.E+tk.W)
         
         # CFM save location
-        self.saveCFMButton.grid(row=13, column=7, sticky=tk.E+tk.W)
+        self.saveCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
         
         # Clear CFM save location
-        self.clearCFMButton.grid(row=14, column=7, sticky=tk.E+tk.W)
+        self.clearCFMButton.grid(row=15, column=7, sticky=tk.E+tk.W)
         
         # Fourier filter
         self.fourierSectLabel.grid(row=17, column=0, sticky=tk.W)
@@ -544,6 +543,9 @@ class HystGUI(tk.Frame):
         # Disable resynchronisation
         self.unsyncLabel.grid(row=16, column=0, sticky=tk.W)
         self.unsyncEntry.grid(row=16, column=1, sticky=tk.W)
+        
+        self.openCFMButton.grid(row=13, column=7, sticky=tk.E+tk.W)
+        self.openFourierButton.grid(row=17, column=7, sticky=tk.E+tk.W)
         
         # Configure grid spacing
         for row_num in range(self.hystGUI.grid_size()[1]):
@@ -980,6 +982,8 @@ class HystGUI(tk.Frame):
             save_cfm_to = open(fileName, "a")
             save_cfm_to.write(self.metadata())
             save_cfm_to.close()
+            
+            self.cfm_time0 = time.time()
     
         # Perform a global synchronisation between the device and the data server:
         # Ensure that 1. the settings have taken effect on the device before issuing
@@ -1007,6 +1011,7 @@ class HystGUI(tk.Frame):
         toolbar = NavigationToolbar2TkAgg(self.canvas, self.plot)
         toolbar.update()
         self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        
         
         for i in range(numLoops):
             
@@ -1365,11 +1370,13 @@ class HystGUI(tk.Frame):
                 # Combine shot trains, saving the scaled scope trains if requested
                 shot_sets = np.empty((0))
                 if self.saveCFM.get() == 1:
-                    # Provide information about biases
+                    # Provide bias metadata
                     save_cfm_to.write("\nProbe Offset\n")
                     save_cfm_to.write(str(probeOffset)+"\n")
                     save_cfm_to.write("Bottom Electrode Offset\n")
                     save_cfm_to.write(str(botElectOffset)+"\n")
+                    save_cfm_to.write("Time\n")
+                    save_cfm_to.write(str(time.time()-self.cfm_time0)+"\n")
                     
                     for shot_set in scope_sample:
                         for key in shot_set:
@@ -1404,11 +1411,13 @@ class HystGUI(tk.Frame):
                 # Combine shot trains
                 shot_sets2 = np.empty((0))
                 if self.saveCFM.get() == 1:
-                    # Provide information about biases
+                    # Provide bias metadata
                     save_cfm_to.write("\nProbe Offset\n")
                     save_cfm_to.write("0\n")
                     save_cfm_to.write("Bottom Electrode Offset\n")
                     save_cfm_to.write("0\n")
+                    save_cfm_to.write("Time\n")
+                    save_cfm_to.write(str(time.time()-self.cfm_time0)+"\n")
                     
                     for shot_set in scope_sample2:
                         for key in shot_set:
@@ -1462,6 +1471,7 @@ class HystGUI(tk.Frame):
     # Record all relevant measurements in dictionary
     def record_meas(self, sample):
         
+        # Append sampled data to sample train
         self.measurements['X'] = np.append(self.measurements['X'], sample['x'])
         self.measurements['Y'] = np.append(self.measurements['Y'], sample['y'])
         self.measurements['R'] = np.append(self.measurements['R'], sample['R'])
@@ -1948,21 +1958,32 @@ class HystGUI(tk.Frame):
     # FFT data, apply filter(s), then IFFT back
     def fourier_filter(self):
         
-        # Unfiltered fourier transform
-        if 'None' in self.filterTypeEntry.get():
+        # Check that user wants their data filtered
+        if self.filterTypeEntry.get() != "":
             
-            # Open Fourier data file for appending
-            with open(self.fourierLocEntry.get(), "a") as f:
+            # Get filters to apply
+            filters = [filt.strip() for filt in self.filterTypeEntry.get().split(';') if filt != '']
+            
+            # Get filtering modes
+            modes = [mode.strip() for mode in self.filterByEntry.get().split(';') if mode != '']
+            
+            filt_param = [param.strip() for param in self.cutoffEntry.get().split(';') if param != '']
+            
+            # Unfiltered fourier transform
+            if 'None' in filters:
                 
-                f.write(self.metadata())
-                f.write("time\tSignal\tfrequency\tfft\tabs(filtered)\tphase(filtered)\n")
-                f.write("s\t-\tHz\t-\t-\tdeg\n")
-            
-                # FFT each shot set
-                if self.filterByEntry.get() == 'Shot Set':
+                # Open Fourier data file for appending
+                with open(self.fourierLocEntry.get(), "a") as f:
                     
-                    with open(self.saveCFMToEntry.get(), "r") as data:
+                    f.write(self.metadata())
+                    f.write("time\tSignal\tfrequency\tfft\tfiltered_signal\n")
+                    f.write("s\t-\tHz\t-\t-\n")
+                
+                    # FFT shots
+                    if 'Shot Set' in self.filterByEntry.get():
                         
+                        with open(self.saveCFMToEntry.get(), "r") as data:
+                            
                             append = False
                             get_time = False
                             get_start_time = False
@@ -1996,8 +2017,8 @@ class HystGUI(tk.Frame):
                                         f.write(str(i*dt+shot_start+start_time)+"\t")
                                         f.write(str(shot[i])+"\t")
                                         f.write(str(freq[i])+"\t")
-                                        f.write(str(fft[i])+"\t")
-                                        f.write("-\t")
+                                        f.write(str(fft[i].real)+"\t")
+                                        f.write(str(fft[i].imag)+"\t")
                                         f.write("-\n")
                                         
                                     # Increment start time for next shot
@@ -2012,15 +2033,419 @@ class HystGUI(tk.Frame):
                                     start_time = float(line)                                                    
                                     get_start_time = False
                                     
-                                elif line == 'Time:\n':
+                                elif line == 'Time\n':
                                     get_start_time = True
-                                    
-                # FFT bias sets
-                if self.filterByEntry.get() == 'Bias Set':
-                        
+                                        
+                    # FFT bias sets
+                    if 'Bias Set' in self.filterByEntry.get():
+                            
                         with open(self.saveCFMToEntry.get(), "r") as data:
                         
-                                    cutoff = float(self.cutoffEntry.get())
+                            append = False
+                            get_time = False
+                            first_scope = True
+                            shot = np.zeros(self.shot_len)
+                            shot_train = np.empty((0)) # Shots will be appended to the shot train
+                            i = 0
+                            dt = 0
+                            start_time = 0
+                            size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
+                            for line in data:
+                                
+                                size -= len(line) # When size 0, EOF has been reached
+                                
+                                if line == 'bwlimit\n':    
+                                    # Append each shot to the shot train
+                                    shot_train = np.append(shot_train, shot)
+                                    append = False
+                                    
+                                elif append:
+                                    shot[i] = float(line)
+                                    i += 1
+                                    
+                                elif line == 'wave\n':
+                                    append = True
+                                    i = 0
+                                    
+                                elif get_time == True:
+                                    dt = float(line)                                                    
+                                    get_time = False
+                                    
+                                elif line == 'dt\n':
+                                    get_time = True
+                                    
+                                elif get_start_time == True:
+                                    start_time = float(line)                                                    
+                                    get_start_time = False
+                                    
+                                elif line == 'Time\n':
+                                    get_start_time = True
+                                    
+                                elif first_scope and line == "Probe Offset\n":
+                                    first_scope = False
+                                    
+                                elif line == "Probe Offset\n" or not size:
+                                    
+                                    fft = np.fft.fft(shot_train)
+                                    freq = np.fft.fftfreq(len(shot_train), dt)
+                                    
+                                    # Append results to fourier file
+                                    for i in range(len(shot_train)):
+                                        
+                                        f.write(str(i*dt+start_time)+"\t")
+                                        f.write(str(shot_train[i])+"\t")
+                                        f.write(str(freq[i])+"\t")
+                                        f.write(str(fft[i].real)+"\t")
+                                        f.write(str(fft[i].imag)+"\t")
+                                        f.write("-\n")
+                                    
+                                    # Clear the shot train for the next shots
+                                    if size:
+                                        shot_train = np.empty((0))
+                    
+                                                    
+            # Open Fourier data file for appending
+            if self.fourierLocEntry.get() != "":
+                
+                with open(self.fourierLocEntry.get(), "a") as f:
+                    
+                    f.write(self.metadata())
+                    f.write("time\tSignal\tfrequency\tfft\tfiltered_signal\n")
+                    f.write("s\t-\tHz\t-\t-\n")
+                    
+                    # Check if user also wants automatic Fourier filtering
+                    if self.fourier.get() == 1:
+                        
+                        # Filter each shot set
+                        if 'Shot Set' in modes:
+                            
+                            # Apply filters
+                            for param_idx, filt in enumerate(filters):
+                                
+                                # Update meta
+                                f.write("Meta: Shot Set, "+filt)
+                                
+                                temp2 = "temp2.txt"
+                                temp = "temp.txt"
+                                with open(self.saveCFMToEntry.get(), "r") as data:
+                                
+                                    # Copy original data, replacing values with filtered values,
+                                    # then replace original data file with it
+                                    with open(temp2, "w") as auto_filt:
+                                        # Create temp file to put calculations in
+                                        with open(temp, "w") as calcs:
+                                            
+                                            append = False
+                                            get_time = False
+                                            get_start_time = False
+                                            shot = np.zeros(self.shot_len)                                            
+                                            i = 0
+                                            start_time = 0
+                                            shot_start = 0
+                                            for line in data:
+                                                    
+                                                if line == 'bwlimit\n':                                        
+                                                    append = False
+                                                    
+                                                elif append:
+                                                    shot[i] = float(line)
+                                                    i += 1
+                                                    
+                                                elif line == 'wave\n':
+                                                    append = True
+                                                    i = 0
+                                                    
+                                                elif get_time == True:
+                                                    # Fourier transform shot
+                                                    dt = float(line)
+                                                    fft = np.fft.fft(shot)
+                                                    freq = np.fft.fftfreq(self.shot_len, dt)
+                                                    
+                                                    # Apply filter
+                                                    filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, self.shot_len, np.mean(shot)<0)
+                                                    
+                                                    # Append results to fourier file
+                                                    for i in range(self.shot_len):
+                                                        
+                                                        f.write(str(i*dt+shot_start+start_time)+"\t")
+                                                        f.write(str(shot[i])+"\t")
+                                                        f.write(str(freq[i])+"\t")
+                                                        f.write(str(fft[i].real)+"\t")
+                                                        f.write(str(fft[i].imag)+"\t")
+                                                        f.write(str(filt_sig[i])+"\t")
+                                                        
+                                                        # Add absolute filtered values to temp file as well
+                                                        calcs.write(str(filt_sig[i])+"\n")
+                                                        
+                                                    # Increment start time for next shot
+                                                    shot_start += self.shot_len*dt
+                                                        
+                                                    # Add blank line between each filtering instance
+                                                    f.write("\n")
+                                                    
+                                                    get_time = False
+                                                    
+                                                elif line == 'dt\n':
+                                                    get_time = True
+                                                    
+                                                elif get_start_time == True:
+                                                    start_time = float(line)                                                    
+                                                    get_start_time = False
+                                                    
+                                                elif line == 'Time\n':
+                                                    get_start_time = True
+                                                    
+                                                    
+                                        # Read calculations from file
+                                        with open(temp, "r") as calcs:
+                                            
+                                            # Copy metadata and replace non-metadata with filtered data
+                                            nonmeta = False
+                                            i = 0
+                                            data.seek(0) # Go back to start of data file
+                                            for line in data:
+                                                
+                                                if nonmeta:
+                                                    
+                                                    if i < self.shot_len:
+                                                        auto_filt.write(calcs.readline())
+                                                        i += 1
+                                                        
+                                                    else:
+                                                        i = 0
+                                                        nonmeta = False
+                                                        auto_filt.write(line)
+                                                        
+                                                # Following lines will be non-meta
+                                                elif line == 'wave':
+                                                    auto_filt.write(line)
+                                                    nonmeta = True
+                                                   
+                                                # Meta
+                                                else:
+                                                    auto_filt.write(line)
+                                                    
+                                        os.remove(temp)
+                                
+                                with open(self.saveCFMToEntry.get(), "w") as data:
+                                    with open(temp2, "r") as auto_filt:
+                                        for line in auto_filt:
+                                            data.write(line)
+                                    
+                                os.remove(temp2)
+                                
+                                
+                        # Filter each bias set
+                        if 'Bias Set' in modes:
+                            
+                            # Apply filters
+                            for param_idx, filt in enumerate(filters):
+                                
+                                # Update meta
+                                f.write("Meta: Bias Set, "+filt)
+                                
+                                temp2 = "temp2.txt"
+                                temp = "temp.txt"
+                                with open(self.saveCFMToEntry.get(), "r") as data:
+                                
+                                    # Copy original data, replacing values with filtered values,
+                                    # then replace original data file with it
+                                    with open(temp2, "w") as auto_filt:
+                                        # Create temp file to put calculations in
+                                        with open(temp, "w") as calcs:
+                                            
+                                            append = False
+                                            get_time = False
+                                            get_start_time = False
+                                            first_scope = True
+                                            shot = np.zeros(self.shot_len)
+                                            shot_train = np.empty((0)) # Shots will be appended to the shot train
+                                            i = 0
+                                            dt = 0
+                                            start_time = 0
+                                            size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
+                                            for line in data:
+                                                
+                                                size -= len(line) # When size 0, EOF has been reached
+                                                
+                                                if line == 'bwlimit\n':
+                                                    # Append each shot to the shot train
+                                                    shot_train = np.append(shot_train, shot)
+                                                    append = False
+                                                    
+                                                elif append:
+                                                    shot[i] = float(line)
+                                                    i += 1
+                                                    
+                                                elif line == 'wave\n':
+                                                    append = True
+                                                    i = 0
+                                                    
+                                                elif get_time == True:
+                                                    dt = float(line)                                                    
+                                                    get_time = False
+                                                    
+                                                elif line == 'dt\n':
+                                                    get_time = True
+                                                    
+                                                elif get_start_time == True:
+                                                    start_time = float(line)                                                    
+                                                    get_start_time = False
+                                                    
+                                                elif line == 'Time\n':
+                                                    get_start_time = True
+                                                    
+                                                elif first_scope and line == "Probe Offset\n":
+                                                    first_scope = False
+                                                    
+                                                elif line == "Probe Offset\n" or not size:
+                                                    
+                                                    fft = np.fft.fft(shot_train)
+                                                    freq = np.fft.fftfreq(len(shot_train), dt)
+                                                    
+                                                    # Apply filter
+                                                    filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, len(shot_train), np.mean(shot_train)<0)
+                                                    
+                                                    # Append results to fourier file
+                                                    for i in range(self.shot_len):
+                                                        
+                                                        f.write(str(i*dt+start_time)+"\t")
+                                                        f.write(str(shot_train[i])+"\t")
+                                                        f.write(str(freq[i])+"\t")
+                                                        f.write(str(fft[i].real)+"\t")
+                                                        f.write(str(fft[i].imag)+"\t")
+                                                        f.write(str(filt_sig[i])+"\t")
+                                                        
+                                                        # Add absolute filtered values to temp file as well
+                                                        calcs.write(str(filt_sig[i])+"\n")
+                                                    
+                                                    # Add blank line between each filtering instance
+                                                    f.write("\n")
+                                                    
+                                                    # Clear the shot train for the next shots
+                                                    if size:
+                                                        shot_train = np.empty((0))
+                                                    
+                                        # Read calculations from file
+                                        with open(temp, "r") as calcs:
+                                            
+                                            # Copy metadata and replace non-metadata with filtered data
+                                            nonmeta = False
+                                            i = 0
+                                            data.seek(0) # Go back to start of data file
+                                            for line in data:
+                                                
+                                                if nonmeta:
+                                                    
+                                                    if i < self.shot_len:
+                                                        auto_filt.write(calcs.readline())
+                                                        i += 1
+                                                        
+                                                    else:
+                                                        i = 0
+                                                        nonmeta = False
+                                                        auto_filt.write(line)
+                                                        
+                                                # Following lines will be non-meta
+                                                elif line == 'wave':
+                                                    auto_filt.write(line)
+                                                    nonmeta = True
+                                                   
+                                                # Meta
+                                                else:
+                                                    auto_filt.write(line)
+                                                    
+                                        os.remove(temp)
+                                
+                                with open(self.saveCFMToEntry.get(), "w") as data:
+                                    with open(temp2, "r") as auto_filt:
+                                        for line in auto_filt:
+                                            data.write(line)
+                                    
+                                os.remove(temp2)
+                       
+                    # User does not want automatic Fourier analysis
+                    else:
+                        
+                        # Filter each shot set
+                        if 'Shot Set' in modes:
+                            
+                            # Apply filters
+                            for param_idx, filt in enumerate(filters):
+                                
+                                # Update meta
+                                f.write("Meta: Shot Set, "+filt)
+                                
+                                with open(self.saveCFMToEntry.get(), "r") as data:
+                                    
+                                    append = False
+                                    get_time = False
+                                    shot = np.zeros(self.shot_len)                                            
+                                    i = 0
+                                    start_time = 0
+                                    shot_start = 0
+                                    for line in data:
+                                            
+                                        if line == 'bwlimit\n':                                        
+                                            append = False
+                                            
+                                        elif append:
+                                            shot[i] = float(line)
+                                            i += 1
+                                            
+                                        elif line == 'wave\n':
+                                            append = True
+                                            i = 0
+                                            
+                                        elif get_time == True:
+                                            # Fourier transform shot
+                                            dt = float(line)
+                                            fft = np.fft.fft(shot)
+                                            freq = np.fft.fftfreq(self.shot_len, dt)
+                                            
+                                            # Apply filter
+                                            filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, len(shot_train), np.mean(shot)<0)
+                                            
+                                            # Append results to fourier file
+                                            for i in range(self.shot_len):
+                                                
+                                                f.write(str(i*dt+shot_start+start_time)+"\t")
+                                                f.write(str(shot[i])+"\t")
+                                                f.write(str(freq[i])+"\t")
+                                                f.write(str(fft[i].real)+"\t")
+                                                f.write(str(fft[i].imag)+"\t")
+                                                f.write(str(filt_sig[i].real)+"\t")
+                                                f.write(str(filt_sig[i].imag)+"\n")
+                                                
+                                            # Increment start time for next shot
+                                            shot_start += self.shot_len*dt
+                                                
+                                            # Add blank line between each filtering instance
+                                            f.write("\n")
+                                            
+                                            get_time = False
+                                            
+                                        elif line == 'dt\n':
+                                            get_time = True
+                                            
+                                        elif get_start_time == True:
+                                            start_time = float(line)                                                    
+                                            get_start_time = False
+                                            
+                                        elif line == 'Time\n':
+                                            get_start_time = True
+                                                
+                        
+                        # Filter each shot train
+                        if 'Bias Set' in modes:
+                            
+                            # Apply filters
+                            for param_idx, filt in enumerate(filters):
+                                
+                                # Update meta
+                                f.write("Meta: Bias Set, "+filt)
+                                
+                                with open(self.saveCFMToEntry.get(), "r") as data:
                                     
                                     append = False
                                     get_time = False
@@ -2035,7 +2460,7 @@ class HystGUI(tk.Frame):
                                         
                                         size -= len(line) # When size 0, EOF has been reached
                                         
-                                        if line == 'bwlimit\n':    
+                                        if line == 'bwlimit\n':     
                                             # Append each shot to the shot train
                                             shot_train = np.append(shot_train, shot)
                                             append = False
@@ -2059,7 +2484,7 @@ class HystGUI(tk.Frame):
                                             start_time = float(line)                                                    
                                             get_start_time = False
                                             
-                                        elif line == 'Time:\n':
+                                        elif line == 'Time\n':
                                             get_start_time = True
                                             
                                         elif first_scope and line == "Probe Offset\n":
@@ -2070,882 +2495,39 @@ class HystGUI(tk.Frame):
                                             fft = np.fft.fft(shot_train)
                                             freq = np.fft.fftfreq(len(shot_train), dt)
                                             
+                                            # Apply filter
+                                            filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, len(shot_train), np.mean(shot_train)<0)
+                                            
                                             # Append results to fourier file
-                                            for i in range(len(shot_train)):
+                                            for i in range(self.shot_len):
                                                 
                                                 f.write(str(i*dt+start_time)+"\t")
                                                 f.write(str(shot_train[i])+"\t")
                                                 f.write(str(freq[i])+"\t")
-                                                f.write(str(fft[i])+"\t")
-                                                f.write("-\t")
-                                                f.write("-\n")
+                                                f.write(str(fft[i].real)+"\t")
+                                                f.write(str(fft[i].imag)+"\t")
+                                                f.write(str(filt_sig[i].real)+"\t")
+                                                f.write(str(filt_sig[i].imag)+"\n")
+                                            
+                                            # Add blank line between each filtering instance
+                                            f.write("\n")
                                             
                                             # Clear the shot train for the next shots
                                             if size:
                                                 shot_train = np.empty((0))
+                                                        
+                   
+            # Check if user wants automatic Fourier filtering with no seperate output
+            elif self.fourier.get() == 1:
                 
-                                                
-                
-        # Open Fourier data file for appending
-        if self.fourierLocEntry.get() != "":
-            with open(self.fourierLocEntry.get(), "a") as f:
-                
-                f.write(self.metadata())
-                f.write("time\tSignal\tfrequency\tfft\tabs(filtered)\tphase(filtered)\n")
-                f.write("s\t-\tHz\t-\t-\tdeg\n")
-                
-                # Check if user also wants automatic Fourier filtering
-                if self.fourier.get() == 1:
-                    
-                    # Filter each shot set
-                    if self.filterByEntry.get() == 'Shot Set':
-                        
-                        # Low pass filter
-                        if self.filterTypeEntry.get() == "Low Pass":
-                            
-                            temp2 = "temp2.txt"
-                            temp = "temp.txt"
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                # Copy original data, replacing values with filtered values,
-                                # then replace original data file with it
-                                with open(temp2, "w") as auto_filt:
-                                    # Create temp file to put calculations in
-                                    with open(temp, "w") as calcs:
-                            
-                                        cutoff = float(self.cutoffEntry.get())
-                                        
-                                        append = False
-                                        get_time = False
-                                        get_start_time = False
-                                        shot = np.zeros(self.shot_len)                                            
-                                        i = 0
-                                        start_time = 0
-                                        shot_start = 0
-                                        for line in data:
-                                                
-                                            if line == 'bwlimit\n':                                        
-                                                append = False
-                                                
-                                            elif append:
-                                                shot[i] = float(line)
-                                                i += 1
-                                                
-                                            elif line == 'wave\n':
-                                                append = True
-                                                i = 0
-                                                
-                                            elif get_time == True:
-                                                # Fourier transform shot
-                                                dt = float(line)
-                                                
-                                                fft = np.fft.fft(shot)
-                                                freq = np.fft.fftfreq(self.shot_len, dt)
-                                                
-                                                # Apply filter in frequency domain
-                                                for i in range(self.shot_len):
-                                                    if freq[i] > cutoff:
-                                                        fft[i] = 0+0j
-                                                
-                                                # Transform filtered signal back to time domain
-                                                filt_sig = np.fft.ifft(fft)
-                                                
-                                                abs_fft = np.absolute(filt_sig)
-                                                phase_fft = np.angle(filt_sig, deg=True)
-                                                
-                                                # Append results to fourier file
-                                                for i in range(self.shot_len):
-                                                    
-                                                    f.write(str(i*dt+shot_start+start_time)+"\t")
-                                                    f.write(str(shot[i])+"\t")
-                                                    f.write(str(freq[i])+"\t")
-                                                    f.write(str(fft[i])+"\t")
-                                                    f.write(str(abs_fft[i])+"\t")
-                                                    f.write(str(phase_fft[i])+"\n")
-                                                    
-                                                    # Add absolute filtered values to temp file as well
-                                                    calcs.write(str(abs_fft[i])+"\n")
-                                                    
-                                                # Increment start time for next shot
-                                                shot_start += self.shot_len*dt
-                                                    
-                                                # Add blank line between each filtering instance
-                                                f.write("\n")
-                                                
-                                                get_time = False
-                                                
-                                            elif line == 'dt\n':
-                                                get_time = True
-                                                
-                                            elif get_start_time == True:
-                                                start_time = float(line)                                                    
-                                                get_start_time = False
-                                                
-                                            elif line == 'Time:\n':
-                                                get_start_time = True
-                                                
-                                                
-                                    # Read calculations from file
-                                    with open(temp, "r") as calcs:
-                                        
-                                        # Copy metadata and replace non-metadata with filtered data
-                                        nonmeta = False
-                                        i = 0
-                                        for line in calcs:
-                                            
-                                            if nonmeta:
-                                                
-                                                if i < self.shot_len:
-                                                    auto_filt.write(calcs.readline())
-                                                    i += 1
-                                                    
-                                                else:
-                                                    i = 0
-                                                    nonmeta = False
-                                                    auto_filt.write(line)
-                                                    
-                                            # Following lines will be non-meta
-                                            elif line == 'wave':
-                                                auto_filt.write(line)
-                                                nonmeta = True
-                                               
-                                            # Meta
-                                            else:
-                                                auto_filt.write(line)
-                                                
-                                    os.remove(temp)
-                            
-                            with open(self.saveCFMToEntry.get(), "w") as data:
-                                with open(temp2, "r") as auto_filt:
-                                    for line in auto_filt:
-                                        data.write(line)
-                                
-                            os.remove(temp2)
-                            
-                        # High pass filter
-                        if self.filterTypeEntry.get() == "High Pass":
-                            
-                            temp2 = "temp2.txt"
-                            temp = "temp.txt"
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                # Copy original data, replacing values with filtered values,
-                                # then replace original data file with it
-                                with open(temp2, "w") as auto_filt:
-                                    # Create temp file to put calculations in
-                                    with open(temp, "w") as calcs:
-                            
-                                        cutoff = float(self.cutoffEntry.get())
-                                        
-                                        append = False
-                                        get_time = False
-                                        get_start_time = False
-                                        shot = np.zeros(self.shot_len)                                            
-                                        i = 0
-                                        start_time = 0
-                                        shot_start = 0
-                                        for line in data:
-                                                
-                                            if line == 'bwlimit\n':       
-                                                append = False
-                                                
-                                            elif append:
-                                                shot[i] = float(line)
-                                                i += 1
-                                                
-                                            elif line == 'wave\n':
-                                                append = True
-                                                i = 0
-                                                
-                                            elif get_time == True:
-                                                # Fourier transform shot
-                                                dt = float(line)
-                                                
-                                                fft = np.fft.fft(shot)
-                                                freq = np.fft.fftfreq(self.shot_len, dt)
-                                                
-                                                # Apply filter in frequency domain
-                                                for i in range(self.shot_len):
-                                                    if freq[i] < cutoff:
-                                                        fft[i] = 0+0j
-                                                
-                                                # Transform filtered signal back to time domain
-                                                filt_sig = np.fft.ifft(fft)
-                                                
-                                                abs_fft = np.absolute(filt_sig)
-                                                phase_fft = np.angle(filt_sig, deg=True)
-                                                
-                                                # Append results to fourier file
-                                                for i in range(self.shot_len):
-                                                    
-                                                    f.write(str(i*dt+shot_start+start_time)+"\t")
-                                                    f.write(str(shot[i])+"\t")
-                                                    f.write(str(freq[i])+"\t")
-                                                    f.write(str(fft[i])+"\t")
-                                                    f.write(str(abs_fft[i])+"\t")
-                                                    f.write(str(phase_fft[i])+"\n")
-                                                    
-                                                    # Add absolute filtered values to temp file as well
-                                                    calcs.write(str(abs_fft[i])+"\n")
-                                                    
-                                                # Increment start time for next shot
-                                                shot_start += self.shot_len*dt
-                                                
-                                                # Add blank line between each filtering instance
-                                                f.write("\n")
-                                                
-                                                get_time = False
-                                                
-                                            elif line == 'dt\n':
-                                                get_time = True
-                                                
-                                            elif get_start_time == True:
-                                                start_time = float(line)                                                    
-                                                get_start_time = False
-                                                
-                                            elif line == 'Time:\n':
-                                                get_start_time = True
-                                                
-                                                
-                                    # Read calculations from file
-                                    with open(temp, "r") as calcs:
-                                        
-                                        # Copy metadata and replace non-metadata with filtered data
-                                        nonmeta = False
-                                        i = 0
-                                        for line in calcs:
-                                            
-                                            if nonmeta:
-                                                
-                                                if i < self.shot_len:
-                                                    auto_filt.write(calcs.readline())
-                                                    i += 1
-                                                    
-                                                else:
-                                                    i = 0
-                                                    nonmeta = False
-                                                    auto_filt.write(line)
-                                                    
-                                            # Following lines will be non-meta
-                                            elif line == 'wave':
-                                                auto_filt.write(line)
-                                                nonmeta = True
-                                               
-                                            # Meta
-                                            else:
-                                                auto_filt.write(line)
-                                                
-                                    os.remove(temp)
-                            
-                            with open(self.saveCFMToEntry.get(), "w") as data:
-                                with open(temp2, "r") as auto_filt:
-                                    for line in auto_filt:
-                                        data.write(line)
-                                
-                            os.remove(temp2)
-                            
-                    # Filter each bias set
-                    elif self.filterByEntry.get() == 'Bias Set':
-                        
-                        # Low pass filter
-                        if self.filterTypeEntry.get() == "Low Pass":
-                            
-                            temp2 = "temp2.txt"
-                            temp = "temp.txt"
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                # Copy original data, replacing values with filtered values,
-                                # then replace original data file with it
-                                with open(temp2, "w") as auto_filt:
-                                    # Create temp file to put calculations in
-                                    with open(temp, "w") as calcs:
-                            
-                                        cutoff = float(self.cutoffEntry.get())
-                                        
-                                        append = False
-                                        get_time = False
-                                        get_start_time = False
-                                        first_scope = True
-                                        shot = np.zeros(self.shot_len)
-                                        shot_train = np.empty((0)) # Shots will be appended to the shot train
-                                        i = 0
-                                        dt = 0
-                                        start_time = 0
-                                        size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
-                                        for line in data:
-                                            
-                                            size -= len(line) # When size 0, EOF has been reached
-                                            
-                                            if line == 'bwlimit\n':
-                                                # Append each shot to the shot train
-                                                shot_train = np.append(shot_train, shot)
-                                                append = False
-                                                
-                                            elif append:
-                                                shot[i] = float(line)
-                                                i += 1
-                                                
-                                            elif line == 'wave\n':
-                                                append = True
-                                                i = 0
-                                                
-                                            elif get_time == True:
-                                                dt = float(line)                                                    
-                                                get_time = False
-                                                
-                                            elif line == 'dt\n':
-                                                get_time = True
-                                                
-                                            elif get_start_time == True:
-                                                start_time = float(line)                                                    
-                                                get_start_time = False
-                                                
-                                            elif line == 'Time:\n':
-                                                get_start_time = True
-                                                
-                                            elif first_scope and line == "Probe Offset\n":
-                                                first_scope = False
-                                                
-                                            elif line == "Probe Offset\n" or not size:
-                                                
-                                                fft = np.fft.fft(shot_train)
-                                                freq = np.fft.fftfreq(len(shot_train), dt)
-                                                
-                                                # Apply filter in frequency domain
-                                                for i in range(len(shot_train)):
-                                                    if freq[i] > cutoff:
-                                                        fft[i] = 0+0j
-                                                
-                                                # Transform filtered signal back to time domain
-                                                filt_sig = np.fft.ifft(fft)
-                                                
-                                                abs_fft = np.absolute(filt_sig)
-                                                phase_fft = np.angle(filt_sig, deg=True)
-                                                
-                                                # Append results to fourier file
-                                                for i in range(len(shot_train)):
-                                                    
-                                                    f.write(str(i*dt+start_time)+"\t")
-                                                    f.write(str(shot_train[i])+"\t")
-                                                    f.write(str(freq[i])+"\t")
-                                                    f.write(str(fft[i])+"\t")
-                                                    f.write(str(abs_fft[i])+"\t")
-                                                    f.write(str(phase_fft[i])+"\n")
-                                                    
-                                                    # Add absolute filtered values to temp file as well
-                                                    calcs.write(str(abs_fft[i])+"\n")
-                                                
-                                                # Add blank line between each filtering instance
-                                                f.write("\n")
-                                                
-                                                # Clear the shot train for the next shots
-                                                if size:
-                                                    shot_train = np.empty((0))
-                                                
-                                    # Read calculations from file
-                                    with open(temp, "r") as calcs:
-                                        
-                                        # Copy metadata and replace non-metadata with filtered data
-                                        nonmeta = False
-                                        i = 0
-                                        for line in calcs:
-                                            
-                                            if nonmeta:
-                                                
-                                                if i < self.shot_len:
-                                                    auto_filt.write(calcs.readline())
-                                                    i += 1
-                                                    
-                                                else:
-                                                    i = 0
-                                                    nonmeta = False
-                                                    auto_filt.write(line)
-                                                    
-                                            # Following lines will be non-meta
-                                            elif line == 'wave':
-                                                auto_filt.write(line)
-                                                nonmeta = True
-                                               
-                                            # Meta
-                                            else:
-                                                auto_filt.write(line)
-                                                
-                                    os.remove(temp)
-                            
-                            with open(self.saveCFMToEntry.get(), "w") as data:
-                                with open(temp2, "r") as auto_filt:
-                                    for line in auto_filt:
-                                        data.write(line)
-                                
-                            os.remove(temp2)
-                            
-                        # High pass filter
-                        if self.filterTypeEntry.get() == "High Pass":
-                            
-                            temp2 = "temp2.txt"
-                            temp = "temp.txt"
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                # Copy original data, replacing values with filtered values,
-                                # then replace original data file with it
-                                with open(temp2, "w") as auto_filt:
-                                    # Create temp file to put calculations in
-                                    with open(temp, "w") as calcs:
-                            
-                                        cutoff = float(self.cutoffEntry.get())
-                                        
-                                        append = False
-                                        get_time = False
-                                        get_start_time = False
-                                        first_scope = True
-                                        shot = np.zeros(self.shot_len)
-                                        shot_train = np.empty((0)) # Shots will be appended to the shot train
-                                        i = 0
-                                        dt = 0
-                                        start_time = 0
-                                        size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
-                                        for line in data:
-                                            
-                                            size -= len(line) # When size 0, EOF has been reached
-                                            
-                                            if line == 'bwlimit\n':
-                                                # Append each shot to the shot train
-                                                shot_train = np.append(shot_train, shot)
-                                                append = False
-                                                
-                                            elif append:
-                                                shot[i] = float(line)
-                                                i += 1
-                                                
-                                            elif line == 'wave\n':
-                                                append = True
-                                                i = 0
-                                                
-                                            elif get_time == True:
-                                                dt = float(line)                                                    
-                                                get_time = False
-                                                
-                                            elif line == 'dt\n':
-                                                get_time = True
-                                                
-                                            elif get_start_time == True:
-                                                start_time = float(line)                                                    
-                                                get_start_time = False
-                                                
-                                            elif line == 'Time:\n':
-                                                get_start_time = True
-                                                
-                                            elif first_scope and line == "Probe Offset\n":
-                                                first_scope = False
-                                                
-                                            elif line == "Probe Offset\n" or not size:
-                                                
-                                                fft = np.fft.fft(shot_train)
-                                                freq = np.fft.fftfreq(len(shot_train), dt)
-                                                
-                                                # Apply filter in frequency domain
-                                                for i in range(len(shot_train)):
-                                                    if freq[i] < cutoff:
-                                                        fft[i] = 0+0j
-                                                
-                                                # Transform filtered signal back to time domain
-                                                filt_sig = np.fft.ifft(fft)
-                                                
-                                                abs_fft = np.absolute(filt_sig)
-                                                phase_fft = np.angle(filt_sig, deg=True)
-                                                
-                                                # Append results to fourier file
-                                                for i in range(len(shot_train)):
-                                                    
-                                                    f.write(str(i*dt+start_time)+"\t")
-                                                    f.write(str(shot_train[i])+"\t")
-                                                    f.write(str(freq[i])+"\t")
-                                                    f.write(str(fft[i])+"\t")
-                                                    f.write(str(abs_fft[i])+"\t")
-                                                    f.write(str(phase_fft[i])+"\n")
-                                                    
-                                                    # Add absolute filtered values to temp file as well
-                                                    calcs.write(str(abs_fft[i])+"\n")
-                                                
-                                                # Add blank line between each filtering instance
-                                                f.write("\n")
-                                                
-                                                # Clear the shot train for the next shots
-                                                if size:
-                                                    shot_train = np.empty((0))
-                                                
-                                    # Read calculations from file
-                                    with open(temp, "r") as calcs:
-                                        
-                                        # Copy metadata and replace non-metadata with filtered data
-                                        nonmeta = False
-                                        i = 0
-                                        for line in calcs:
-                                            
-                                            if nonmeta:
-                                                
-                                                if i < self.shot_len:
-                                                    auto_filt.write(calcs.readline())
-                                                    i += 1
-                                                    
-                                                else:
-                                                    i = 0
-                                                    nonmeta = False
-                                                    auto_filt.write(line)
-                                                    
-                                            # Following lines will be non-meta
-                                            elif line == 'wave':
-                                                auto_filt.write(line)
-                                                nonmeta = True
-                                               
-                                            # Meta
-                                            else:
-                                                auto_filt.write(line)
-                                                
-                                    os.remove(temp)
-                            
-                            with open(self.saveCFMToEntry.get(), "w") as data:
-                                with open(temp2, "r") as auto_filt:
-                                    for line in auto_filt:
-                                        data.write(line)
-                                
-                            os.remove(temp2)                            
-                        
-                else:
-                    
-                    # Filter each shot set
-                    if self.filterByEntry.get() == 'Shot Set':
-                        
-                        # Low pass filter
-                        if self.filterTypeEntry.get() == "Low Pass":
-                            
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                cutoff = float(self.cutoffEntry.get())
-                                
-                                append = False
-                                get_time = False
-                                shot = np.zeros(self.shot_len)                                            
-                                i = 0
-                                start_time = 0
-                                shot_start = 0
-                                for line in data:
-                                        
-                                    if line == 'bwlimit\n':                                        
-                                        append = False
-                                        
-                                    elif append:
-                                        shot[i] = float(line)
-                                        i += 1
-                                        
-                                    elif line == 'wave\n':
-                                        append = True
-                                        i = 0
-                                        
-                                    elif get_time == True:
-                                        # Fourier transform shot
-                                        dt = float(line)
-                                        
-                                        fft = np.fft.fft(shot)
-                                        freq = np.fft.fftfreq(self.shot_len, dt)
-                                        
-                                        # Apply filter in frequency domain
-                                        for i in range(self.shot_len):
-                                            if freq[i] > cutoff:
-                                                fft[i] = 0+0j
-                                        
-                                        # Transform filtered signal back to time domain
-                                        filt_sig = np.fft.ifft(fft)
-                                        
-                                        abs_fft = np.absolute(filt_sig)
-                                        phase_fft = np.angle(filt_sig, deg=True)
-                                        
-                                        # Append results to fourier file
-                                        for i in range(self.shot_len):
-                                            
-                                            f.write(str(i*dt+shot_start+start_time)+"\t")
-                                            f.write(str(shot[i])+"\t")
-                                            f.write(str(freq[i])+"\t")
-                                            f.write(str(fft[i])+"\t")
-                                            f.write(str(abs_fft[i])+"\t")
-                                            f.write(str(phase_fft[i])+"\n")
-                                            
-                                        # Increment start time for next shot
-                                        shot_start += self.shot_len*dt
-                                            
-                                        # Add blank line between each filtering instance
-                                        f.write("\n")
-                                        
-                                        get_time = False
-                                        
-                                    elif line == 'dt\n':
-                                        get_time = True
-                                        
-                                    elif get_start_time == True:
-                                        start_time = float(line)                                                    
-                                        get_start_time = False
-                                        
-                                    elif line == 'Time:\n':
-                                        get_start_time = True
-                                
-                            
-                        # High pass filter
-                        if self.filterTypeEntry.get() == "High Pass":
-                            
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                cutoff = float(self.cutoffEntry.get())
-                                
-                                append = False
-                                get_time = False
-                                shot = np.zeros(self.shot_len)                                            
-                                i = 0
-                                start_time = 0
-                                shot_start = 0
-                                for line in data:
-                                        
-                                    if line == 'bwlimit\n':       
-                                        append = False
-                                        
-                                    elif append:
-                                        shot[i] = float(line)
-                                        i += 1
-                                        
-                                    elif line == 'wave\n':
-                                        append = True
-                                        i = 0
-                                        
-                                    elif get_time == True:
-                                        # Fourier transform shot
-                                        dt = float(line)
-                                        
-                                        fft = np.fft.fft(shot)
-                                        freq = np.fft.fftfreq(self.shot_len, dt)
-                                        
-                                        # Apply filter in frequency domain
-                                        for i in range(self.shot_len):
-                                            if freq[i] < cutoff:
-                                                fft[i] = 0+0j
-                                        
-                                        # Transform filtered signal back to time domain
-                                        filt_sig = np.fft.ifft(fft)
-                                        
-                                        abs_fft = np.absolute(filt_sig)
-                                        phase_fft = np.angle(filt_sig, deg=True)
-                                        
-                                        # Append results to fourier file
-                                        for i in range(self.shot_len):
-                                            
-                                            f.write(str(i*dt+shot_start+start_time)+"\t")
-                                            f.write(str(shot[i])+"\t")
-                                            f.write(str(freq[i])+"\t")
-                                            f.write(str(fft[i])+"\t")
-                                            f.write(str(abs_fft[i])+"\t")
-                                            f.write(str(phase_fft[i])+"\n")
-                                            
-                                            # Add absolute filtered values to temp file as well
-                                            calcs.write(str(abs_fft[i])+"\n")
-                                            
-                                        # Increment start time for next shot
-                                        shot_start += self.shot_len*dt
-                                        
-                                        # Add blank line between each filtering instance
-                                        f.write("\n")
-                                        
-                                        get_time = False
-                                        
-                                    elif line == 'dt\n':
-                                        get_time = True
-                                        
-                                    elif get_start_time == True:
-                                        start_time = float(line)                                                    
-                                        get_start_time = False
-                                        
-                                    elif line == 'Time:\n':
-                                        get_start_time = True
-                                            
-                    
-                    # Filter each shot train
-                    elif self.filterByEntry.get() == 'Bias Set':
-                        
-                        # Low pass filter
-                        if self.filterTypeEntry.get() == "Low Pass":
-                            
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                cutoff = float(self.cutoffEntry.get())
-                                
-                                append = False
-                                get_time = False
-                                first_scope = True
-                                shot = np.zeros(self.shot_len)
-                                shot_train = np.empty((0)) # Shots will be appended to the shot train
-                                i = 0
-                                dt = 0
-                                start_time = 0
-                                size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
-                                for line in data:
-                                    
-                                    size -= len(line) # When size 0, EOF has been reached
-                                    
-                                    if line == 'bwlimit\n':     
-                                        # Append each shot to the shot train
-                                        shot_train = np.append(shot_train, shot)
-                                        append = False
-                                        
-                                    elif append:
-                                        shot[i] = float(line)
-                                        i += 1
-                                        
-                                    elif line == 'wave\n':
-                                        append = True
-                                        i = 0
-                                        
-                                    elif get_time == True:
-                                        dt = float(line)                                                    
-                                        get_time = False
-                                        
-                                    elif line == 'dt\n':
-                                        get_time = True
-                                        
-                                    elif get_start_time == True:
-                                        start_time = float(line)                                                    
-                                        get_start_time = False
-                                        
-                                    elif line == 'Time:\n':
-                                        get_start_time = True
-                                        
-                                    elif first_scope and line == "Probe Offset\n":
-                                        first_scope = False
-                                        
-                                    elif line == "Probe Offset\n" or not size:
-                                        
-                                        fft = np.fft.fft(shot_train)
-                                        freq = np.fft.fftfreq(len(shot_train), dt)
-                                        
-                                        # Apply filter in frequency domain
-                                        for i in range(len(shot_train)):
-                                            if freq[i] > cutoff:
-                                                fft[i] = 0+0j
-                                        
-                                        # Transform filtered signal back to time domain
-                                        filt_sig = np.fft.ifft(fft)
-                                        
-                                        abs_fft = np.absolute(filt_sig)
-                                        phase_fft = np.angle(filt_sig, deg=True)
-                                        
-                                        # Append results to fourier file
-                                        for i in range(len(shot_train)):
-                                            
-                                            f.write(str(i*dt+start_time)+"\t")
-                                            f.write(str(shot_train[i])+"\t")
-                                            f.write(str(freq[i])+"\t")
-                                            f.write(str(fft[i])+"\t")
-                                            f.write(str(abs_fft[i])+"\t")
-                                            f.write(str(phase_fft[i])+"\n")
-                                            
-                                            # Add absolute filtered values to temp file as well
-                                            calcs.write(str(abs_fft[i])+"\n")
-                                        
-                                        # Add blank line between each filtering instance
-                                        f.write("\n")
-                                        
-                                        # Clear the shot train for the next shots
-                                        if size:
-                                            shot_train = np.empty((0))
-                                                    
-                            
-                        # High pass filter
-                        if self.filterTypeEntry.get() == "High Pass":
-                            
-                            with open(self.saveCFMToEntry.get(), "r") as data:
-                            
-                                cutoff = float(self.cutoffEntry.get())
-                                
-                                append = False
-                                get_time = False
-                                first_scope = True
-                                shot = np.zeros(self.shot_len)
-                                shot_train = np.empty((0)) # Shots will be appended to the shot train
-                                i = 0
-                                dt = 0
-                                start_time = 0
-                                size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
-                                for line in data:
-                                    
-                                    size -= len(line) # When size 0, EOF has been reached
-                                    
-                                    if line == 'bwlimit\n':   
-                                        # Append each shot to the shot train
-                                        shot_train = np.append(shot_train, shot)
-                                        append = False
-                                        
-                                    elif append:
-                                        shot[i] = float(line)
-                                        i += 1
-                                        
-                                    elif line == 'wave\n':
-                                        append = True
-                                        i = 0
-                                        
-                                    elif get_time == True:
-                                        dt = float(line)                                                    
-                                        get_time = False
-                                        
-                                    elif line == 'dt\n':
-                                        get_time = True
-                                        
-                                    elif get_start_time == True:
-                                        start_time = float(line)                                                    
-                                        get_start_time = False
-                                        
-                                    elif line == 'Time:\n':
-                                        get_start_time = True
-                                        
-                                    elif line == "Probe Offset\n" or not size:
-                                        
-                                        fft = np.fft.fft(shot_train)
-                                        freq = np.fft.fftfreq(len(shot_train), dt)
-                                        
-                                        # Apply filter in frequency domain
-                                        for i in range(len(shot_train)):
-                                            if freq[i] < cutoff:
-                                                fft[i] = 0+0j
-                                        
-                                        # Transform filtered signal back to time domain
-                                        filt_sig = np.fft.ifft(fft)
-                                        
-                                        abs_fft = np.absolute(filt_sig)
-                                        phase_fft = np.angle(filt_sig, deg=True)
-                                        
-                                        # Append results to fourier file
-                                        for i in range(len(shot_train)):
-                                            
-                                            f.write(str(i*dt+start_time)+"\t")
-                                            f.write(str(shot_train[i])+"\t")
-                                            f.write(str(freq[i])+"\t")
-                                            f.write(str(fft[i])+"\t")
-                                            f.write(str(abs_fft[i])+"\t")
-                                            f.write(str(phase_fft[i])+"\n")
-                                            
-                                            # Add absolute filtered values to temp file as well
-                                            calcs.write(str(abs_fft[i])+"\n")
-                                        
-                                        # Add blank line between each filtering instance
-                                        f.write("\n")
-                                        
-                                        # Clear the shot train for the next shots
-                                        if size:
-                                            shot_train = np.empty((0))
-                                                
-                    
-               
-        # Check if user wants automatic Fourier filtering with no seperate output
-        elif self.fourier.get() == 1:
                 # Filter each shot
-                if self.filterByEntry.get() == 'Shot Set':
-                    # Low pass filter
-                    if self.filterTypeEntry.get() == "Low Pass":
+                if 'Shot Set' in modes:
+                    
+                    # Apply filters
+                    for param_idx, filt in enumerate(filters):
+                        
+                        # Update meta
+                        f.write("Meta: Shot Set, "+filt)
                         
                         temp2 = "temp2.txt"
                         temp = "temp.txt"
@@ -2956,8 +2538,6 @@ class HystGUI(tk.Frame):
                             with open(temp2, "w") as auto_filt:
                                 # Create temp file to put calculations in
                                 with open(temp, "w") as calcs:
-                        
-                                    cutoff = float(self.cutoffEntry.get())
                                     
                                     append = False
                                     get_time = False
@@ -2982,20 +2562,13 @@ class HystGUI(tk.Frame):
                                             fft = np.fft.fft(shot)
                                             freq = np.fft.fftfreq(self.shot_len, dt)
                                             
-                                            # Apply filter in frequency domain
-                                            for i in range(self.shot_len):
-                                                if freq[i] > cutoff:
-                                                    fft[i] = 0+0j
+                                            # Apply filter
+                                            filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, len(shot), np.mean(shot)<0)
                                             
-                                            # Transform filtered signal back to time domain
-                                            filt_sig = np.fft.ifft(fft)
-                                            
-                                            abs_fft = np.absolute(filt_sig)
-                                            phase_fft = np.angle(filt_sig, deg=True)
-                                            
-                                            # Add absolute filtered values to temp file 
-                                            for i in range(self.shot_len):
-                                                calcs.write(str(abs_fft[i])+"\n")
+                                            # Append results to fourier file
+                                            for i in range(self.shot_len):                                                        
+                                                # Add absolute filtered values to temp file as well
+                                                calcs.write(str(filt_sig[i])+"\n")
                                             
                                             get_time = False
                                             
@@ -3009,102 +2582,8 @@ class HystGUI(tk.Frame):
                                     # Copy metadata and replace non-metadata with filtered data
                                     nonmeta = False
                                     i = 0
-                                    for line in calcs:
-                                        
-                                        if nonmeta:
-                                            
-                                            if i < self.shot_len:
-                                                auto_filt.write(calcs.readline())
-                                                i += 1
-                                                
-                                            else:
-                                                i = 0
-                                                nonmeta = False
-                                                auto_filt.write(line)
-                                                
-                                        # Following lines will be non-meta
-                                        elif line == 'wave':
-                                            auto_filt.write(line)
-                                            nonmeta = True
-                                           
-                                        # Meta
-                                        else:
-                                            auto_filt.write(line)
-                                            
-                                os.remove(temp)
-                        
-                        with open(self.saveCFMToEntry.get(), "w") as data:
-                            with open(temp2, "r") as auto_filt:
-                                for line in auto_filt:
-                                    data.write(line)
-                            
-                        os.remove(temp2)
-                        
-                    # High pass filter
-                    if self.filterTypeEntry.get() == "High Pass":
-                        
-                        temp2 = "temp2.txt"
-                        temp = "temp.txt"
-                        with open(self.saveCFMToEntry.get(), "r") as data:
-                        
-                            # Copy original data, replacing values with filtered values,
-                            # then replace original data file with it
-                            with open(temp2, "w") as auto_filt:
-                                # Create temp file to put calculations in
-                                with open(temp, "w") as calcs:
-                        
-                                    cutoff = float(self.cutoffEntry.get())
-                                    
-                                    append = False
-                                    get_time = False
-                                    shot = np.zeros(self.shot_len)                                            
-                                    i = 0
+                                    data.seek(0) # Go back to start of data file
                                     for line in data:
-                                            
-                                        if line == 'bwlimit\n':       
-                                            append = False
-                                            
-                                        elif append:
-                                            shot[i] = float(line)
-                                            i += 1
-                                            
-                                        elif line == 'wave\n':
-                                            append = True
-                                            i = 0
-                                            
-                                        elif get_time == True:
-                                            # Fourier transform shot
-                                            dt = float(line)
-                                            fft = np.fft.fft(shot)
-                                            freq = np.fft.fftfreq(self.shot_len, dt)
-                                            
-                                            # Apply filter in frequency domain
-                                            for i in range(self.shot_len):
-                                                if freq[i] < cutoff:
-                                                    fft[i] = 0+0j
-                                            
-                                            # Transform filtered signal back to time domain
-                                            filt_sig = np.fft.ifft(fft)
-                                            
-                                            abs_fft = np.absolute(filt_sig)
-                                            
-                                            # Add absolute filtered values to temp file
-                                            for i in range(self.shot_len):
-                                                calcs.write(str(abs_fft[i])+"\n")
-                                            
-                                            get_time = False
-                                            
-                                        elif line == 'dt\n':
-                                            get_time = True
-                                            
-                                            
-                                # Read calculations from file
-                                with open(temp, "r") as calcs:
-                                    
-                                    # Copy metadata and replace non-metadata with filtered data
-                                    nonmeta = False
-                                    i = 0
-                                    for line in calcs:
                                         
                                         if nonmeta:
                                             
@@ -3127,19 +2606,22 @@ class HystGUI(tk.Frame):
                                             auto_filt.write(line)
                                             
                                 os.remove(temp)
-                                
+                        
                         with open(self.saveCFMToEntry.get(), "w") as data:
                             with open(temp2, "r") as auto_filt:
                                 for line in auto_filt:
                                     data.write(line)
                             
                         os.remove(temp2)
-                      
+                        
                 # Filter each bias set
-                elif self.filterByEntry.get() == 'Bias Set':
+                if 'Bias Set' in modes:
                     
-                    # Low pass filter
-                    if self.filterTypeEntry.get() == "Low Pass":
+                    # Apply filters
+                    for param_idx, filt in enumerate(filters):
+                        
+                        # Update meta
+                        f.write("Meta: Shot Set, "+filt)
                         
                         temp2 = "temp2.txt"
                         temp = "temp.txt"
@@ -3150,8 +2632,6 @@ class HystGUI(tk.Frame):
                             with open(temp2, "w") as auto_filt:
                                 # Create temp file to put calculations in
                                 with open(temp, "w") as calcs:
-                        
-                                    cutoff = float(self.cutoffEntry.get())
                                     
                                     append = False
                                     get_time = False
@@ -3193,20 +2673,13 @@ class HystGUI(tk.Frame):
                                             fft = np.fft.fft(shot_train)
                                             freq = np.fft.fftfreq(len(shot_train), dt)
                                             
-                                            # Apply filter in frequency domain
-                                            for i in range(len(shot_train)):
-                                                if freq[i] > cutoff:
-                                                    fft[i] = 0+0j
+                                            # Apply filter
+                                            filt_sig = self.apply_filter(filt, filt_param[param_idx], fft, freq, len(shot_train), np.mean(shot_train)<0)
                                             
-                                            # Transform filtered signal back to time domain
-                                            filt_sig = np.fft.ifft(fft)
-                                            
-                                            abs_fft = np.absolute(filt_sig)
-                                            phase_fft = np.angle(filt_sig, deg=True)
-                                            
-                                            # Add absolute filtered values to temp file
-                                            for i in range(len(shot_train)):
-                                                calcs.write(str(abs_fft[i])+"\n")
+                                            # Append results to fourier file
+                                            for i in range(self.shot_len):                                                        
+                                                # Add absolute filtered values to temp file as well
+                                                calcs.write(str(filt_sig[i])+"\n")
                                             
                                             # Clear the shot train for the next shots
                                             if size:
@@ -3218,119 +2691,9 @@ class HystGUI(tk.Frame):
                                     # Copy metadata and replace non-metadata with filtered data
                                     nonmeta = False
                                     i = 0
-                                    for line in calcs:
-                                        
-                                        if nonmeta:
-                                            
-                                            if i < self.shot_len:
-                                                auto_filt.write(calcs.readline())
-                                                i += 1
-                                                
-                                            else:
-                                                i = 0
-                                                nonmeta = False
-                                                auto_filt.write(line)
-                                                
-                                        # Following lines will be non-meta
-                                        elif line == 'wave':
-                                            auto_filt.write(line)
-                                            nonmeta = True
-                                           
-                                        # Meta
-                                        else:
-                                            auto_filt.write(line)
-                                            
-                                os.remove(temp)
-                        
-                        with open(self.saveCFMToEntry.get(), "w") as data:
-                            with open(temp2, "r") as auto_filt:
-                                for line in auto_filt:
-                                    data.write(line)
-                            
-                        os.remove(temp2)
-                        
-                    # High pass filter
-                    if self.filterTypeEntry.get() == "High Pass":
-                        
-                        temp2 = "temp2.txt"
-                        temp = "temp.txt"
-                        with open(self.saveCFMToEntry.get(), "r") as data:
-                        
-                            # Copy original data, replacing values with filtered values,
-                            # then replace original data file with it
-                            with open(temp2, "w") as auto_filt:
-                                # Create temp file to put calculations in
-                                with open(temp, "w") as calcs:
-                        
-                                    cutoff = float(self.cutoffEntry.get())
-                                    
-                                    append = False
-                                    get_time = False
-                                    first_scope = True
-                                    shot = np.zeros(self.shot_len)
-                                    shot_train = np.empty((0)) # Shots will be appended to the shot train
-                                    i = 0
-                                    dt = 0
-                                    size = os.path.getsize(self.saveCFMToEntry.get()) # Use file size to detect if EOF has been reached
+                                    data.seek(0) # Go back to start of data file
                                     for line in data:
                                         
-                                        size -= len(line) # When size 0, EOF has been reached
-                                        
-                                        if line == 'bwlimit\n':  
-                                            # Append each shot to the shot train
-                                            shot_train = np.append(shot_train, shot)
-                                            append = False
-                                            
-                                        elif append:
-                                            shot[i] = float(line)
-                                            i += 1
-                                            
-                                        elif line == 'wave\n':
-                                            append = True
-                                            i = 0
-                                            
-                                        elif get_time == True:
-                                            dt = float(line)                                                    
-                                            get_time = False
-                                            
-                                        elif line == 'dt\n':
-                                            get_time = True
-                                            
-                                        elif first_scope and line == "Probe Offset\n":
-                                            first_scope = False
-                                            
-                                        elif line == "Probe Offset\n" or not size:
-                                            
-                                            fft = np.fft.fft(shot_train)
-                                            freq = np.fft.fftfreq(len(shot_train), dt)
-                                            
-                                            # Apply filter in frequency domain
-                                            for i in range(len(shot_train)):
-                                                if freq[i] < cutoff:
-                                                    fft[i] = 0+0j
-                                            
-                                            # Transform filtered signal back to time domain
-                                            filt_sig = np.fft.ifft(fft)
-                                            
-                                            abs_fft = np.absolute(filt_sig)
-                                            phase_fft = np.angle(filt_sig, deg=True)
-                                            
-                                            # Add absolute filtered values to temp file 
-                                            for i in range(len(shot_train)):
-                                                calcs.write(str(abs_fft[i])+"\n")
-                                            
-                                            # Clear the shot train for the next shots
-                                            if size:
-                                                shot_train = np.empty((0))
-                                            
-                                # Read calculations from file
-                                with open(temp, "r") as calcs:
-                                    
-                                    # Copy metadata and replace non-metadata with filtered data
-                                    nonmeta = False
-                                    i = 0
-                                    for line in calcs:
-                                        
                                         if nonmeta:
                                             
                                             if i < self.shot_len:
@@ -3343,7 +2706,7 @@ class HystGUI(tk.Frame):
                                                 auto_filt.write(line)
                                                 
                                         # Following lines will be non-meta
-                                        elif line == 'wave':
+                                        elif line == 'wave\n':
                                             auto_filt.write(line)
                                             nonmeta = True
                                            
@@ -3352,14 +2715,62 @@ class HystGUI(tk.Frame):
                                             auto_filt.write(line)
                                             
                                 os.remove(temp)
-                                
+                        
                         with open(self.saveCFMToEntry.get(), "w") as data:
                             with open(temp2, "r") as auto_filt:
                                 for line in auto_filt:
                                     data.write(line)
                             
                         os.remove(temp2)
+    
+    
+    # View CFM data in text editor
+    def openCFM(self):
+        os.startfile(self.saveCFMToEntry.get())
+    
+    
+    # View filter data in text editor
+    def openFourier(self):
+        os.startfile(self.fourierLocEntry.get())
         
+        
+    # Convolute signal with filter in frequency domain
+    @staticmethod
+    def apply_filter(filt, filt_param, fft_orig, freq, size, neg = False):
+        
+        # Copy fft so we can convolute filters with it without affecting the original fft
+        fft = np.copy(fft_orig)
+        
+        # Get subfilters
+        sub_filts = [sub_filt.strip() for sub_filt in filt.split(':') if sub_filt != '' and sub_filt != 'None']
+        
+        # Get subfilter parameters
+        sub_filt_params = [sub_filt_param.strip() for sub_filt_param in filt_param.split(':') if sub_filt_param != '']
+        
+        # Convolute subfilters with signal. The lowest index filter is applied first
+        for param_idx, sub_filt in enumerate(sub_filts):
+            
+            if sub_filt == 'Low Pass':
+                
+                cutoff = float(sub_filt_params[param_idx])
+                for i in range(size):
+                    if freq[i] > cutoff:
+                        fft[i] = 0+0j
+                        
+            if sub_filt == 'High Pass':
+                
+                cutoff = float(sub_filt_params[param_idx])
+                for i in range(size):
+                    if freq[i] < cutoff:
+                        fft[i] = 0+0j
+                
+        # Transform filtered signal back to time domain and take absolute values
+        # negating them if specified
+        if neg:
+            return -np.absolute(np.fft.ifft(fft))
+        else:
+            return np.absolute(np.fft.ifft(fft))
+    
 
 if __name__ == "__main__":
     hystGUI = tk.Tk()
