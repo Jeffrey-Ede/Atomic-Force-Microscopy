@@ -7,24 +7,22 @@
 #    http://shiny.rstudio.com/
 #
 
-library(shiny)
 
 # Define UI for application that draws a histogram
-shinyUI(fluidPage(
+fluidPage(
   
-  navlistPanel(
-    "Contents",
+  navbarPage("Help pages:",
     tabPanel("About",
-             includeMarkdown("About.md")
+             includeHTML("About.html")
     ),
     tabPanel("Features",
-             includeMarkdown("Features.md")
+             includeHTML("Features.html")
     ),
     tabPanel("Controls",
-             includeMarkdown("Controls.md")
-    )# ),
-    # tabPanel("Voltage Trains",
-    #          includeMarkdown("voltage_trains_intro.md")
-    # )
+             includeHTML("Controls.html")
+    ),
+    tabPanel("Voltage Trains",
+             includeHTML("voltage_trains_intro.html")
+    )
   )
-))
+)
