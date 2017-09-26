@@ -46,7 +46,9 @@ Filtering capabilities added for CFM data.
 
 CFM and filter data file input/output controls added.
 
-Settings can be saved to and loaded from files
+Settings can be saved to and loaded from files.
+
+Metadata added to data files.
 
 Help button opens help pages in web browser. Help pages link to an online voltage train simulator.
 
