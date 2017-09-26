@@ -12,7 +12,7 @@ The code relies on relevant instrument drivers being installed. Figuring out how
 
 ## Hysteresis_Measurement
 
-Contents: Python source code, batch file to start graphical user interface, icon for batch shortcut, text file containing default values and tooltips module.
+Contents: Python source code, batch file to start graphical user interface, icon for batch shortcut, text file containing default values, tooltips module and help webpages.
 
 ### Intrument:
 
@@ -40,7 +40,15 @@ Graph displays measurements as they are taken. Its axes can be changed via the m
 
 Repeated data points can be averaged before display or data is saved.
 
-Help button links to online voltage train explanation and simulator.
+Current force microscopy (CFM) functionality added.
+
+Filtering capabilities added for CFM data.
+
+CFM and filter data file input/output controls added.
+
+Settings can be saved to and loaded from files
+
+Help button opens help pages in web browser. Help pages link to an online voltage train simulator.
 
 ## Superconductor_Fields
 
