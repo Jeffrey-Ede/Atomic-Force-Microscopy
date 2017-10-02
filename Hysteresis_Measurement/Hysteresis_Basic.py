@@ -37,7 +37,7 @@ class HystGUI(tk.Frame):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.hystGUI = parent
         self.deviceID = 'dev801'
-        self.hystGUI.title("Hysteresis Measurement")
+        self.hystGUI.title("HysteresisB - Jeffrey M. Ede")
         self.backClr = "#a1dbcd"
         self.btnClr = "#73c6b6"
         self.hystGUI.configure(background=self.backClr)
