@@ -12,7 +12,7 @@ The code relies on relevant instrument drivers being installed. Figuring out how
 
 ## Hysteresis_Measurement
 
-Contents: Python source code, batch file to start graphical user interface, icon for batch shortcut, text file containing default values, tooltips module and help webpages.
+Contents: Python source code, batch file to start graphical user interface, icon for batch shortcut, text file containing default values, tooltips module, python source code for basic version, and help webpages.
 
 ### Intrument:
 
@@ -51,6 +51,8 @@ Settings can be saved to and loaded from files.
 Metadata added to data files.
 
 Help button opens help pages in web browser. Help pages link to an online voltage train simulator.
+
+Basic version without CFM or filtering functionality.
 
 ## Superconductor_Fields
 
